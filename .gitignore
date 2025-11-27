@@ -10,7 +10,6 @@ CMakeFiles/
 *.elf
 *.bin
 *.hex
-*.uf2
 *.dis
 *.map
 

@@ -1,0 +1,66 @@
+#include "io_ports.h"
+
+#include <string.h>
+
+#include "PortDrivers/time_io.h"
+#include "PortDrivers/utility_io.h"
+
+#define REQUEST_BUFFER_SIZE 128
+
+typedef struct
+{
+    size_t len;
+    size_t count;
+    char buffer[REQUEST_BUFFER_SIZE];
+} request_unit_t;
+
+static request_unit_t request_unit;
+
+void io_port_out(uint8_t port, uint8_t data)
+{
+    memset(&request_unit, 0, sizeof(request_unit));
+
+    switch (port)
+    {
+        case 24:
+        case 25:
+        case 26:
+        case 27:
+        case 28:
+        case 29:
+        case 30:
+        case 41:
+        case 42:
+        case 43:
+            request_unit.len = time_output(port, data, request_unit.buffer, sizeof(request_unit.buffer));
+            break;
+        case 45:
+            request_unit.len = utility_output(port, data, request_unit.buffer, sizeof(request_unit.buffer));
+            break;
+        default:
+            break;
+    }
+}
+
+uint8_t io_port_in(uint8_t port)
+{
+    switch (port)
+    {
+        case 24:
+        case 25:
+        case 26:
+        case 27:
+        case 28:
+        case 29:
+        case 30:
+            return time_input(port);
+        case 200:
+            if (request_unit.count < request_unit.len && request_unit.count < sizeof(request_unit.buffer))
+            {
+                return (uint8_t)request_unit.buffer[request_unit.count++];
+            }
+            return 0x00;
+        default:
+            return 0x00;
+    }
+}

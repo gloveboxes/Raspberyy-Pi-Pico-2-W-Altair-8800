@@ -14,12 +14,16 @@ add_executable(altair
     Altair8800/intel8080.c
     Altair8800/memory.c
     Altair8800/pico_disk.c
+    io_ports.c
+    PortDrivers/time_io.c
+    PortDrivers/utility_io.c
 )
 
 # Make sure all CYW43 headers are visible and include Altair8800 directory
 target_include_directories(altair PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}
     ${CMAKE_CURRENT_LIST_DIR}/Altair8800
+    ${CMAKE_CURRENT_LIST_DIR}/PortDrivers
     ${PICO_SDK_PATH}/src/rp2_common/pico_cyw43_arch/include
     ${PICO_SDK_PATH}/src/rp2_common/pico_cyw43_driver/include
     ${PICO_SDK_PATH}/lib/cyw43-driver/src        # 👈 this one is for cyw43.h

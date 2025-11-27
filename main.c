@@ -1,11 +1,14 @@
 #include "pico/stdlib.h"
 #include "pico/cyw43_arch.h"
 #include <stdio.h>
+#include <string.h>
 #include "Altair8800/intel8080.h"
 #include "Altair8800/memory.h"
 #include "Altair8800/pico_disk.h"
+#include "io_ports.h"
 
 #define ASCII_MASK_7BIT 0x7F
+#define CTRL_KEY(ch) ((ch) & 0x1F)
 
 // Include the CPM disk image
 #include "Altair8800/cpm63k_disk.h"
@@ -16,12 +19,66 @@ static intel8080_t cpu;
 // Terminal read function - non-blocking
 static char terminal_read(void)
 {
+    // Translate ANSI cursor sequences to the control keys CP/M expects (WordStar style).
+    enum
+    {
+        KEY_STATE_NORMAL = 0,
+        KEY_STATE_ESC,
+        KEY_STATE_ESC_BRACKET
+    };
+
+    static uint8_t key_state = KEY_STATE_NORMAL;
+
     int c = getchar_timeout_us(0); // Non-blocking read
     if (c == PICO_ERROR_TIMEOUT)
     {
         return 0x00; // Return null if no character available
     }
-    return (char)(c & ASCII_MASK_7BIT);
+
+    uint8_t ch = (uint8_t)(c & ASCII_MASK_7BIT);
+
+    switch (key_state)
+    {
+    case KEY_STATE_NORMAL:
+        if (ch == 0x1B)
+        {
+            key_state = KEY_STATE_ESC;
+            return 0x00; // Start of escape sequence
+        }
+        if (ch == 0x7F || ch == '\b')
+        {
+            return CTRL_KEY('H'); // Map delete/backspace to Ctrl-H
+        }
+        return (char)ch;
+
+    case KEY_STATE_ESC:
+        if (ch == '[')
+        {
+            key_state = KEY_STATE_ESC_BRACKET;
+            return 0x00; // Control sequence introducer
+        }
+        key_state = KEY_STATE_NORMAL;
+        return (char)ch; // Pass through unknown sequences
+
+    case KEY_STATE_ESC_BRACKET:
+        key_state = KEY_STATE_NORMAL;
+        switch (ch)
+        {
+        case 'A':
+            return CTRL_KEY('E'); // Up -> Ctrl-E
+        case 'B':
+            return CTRL_KEY('X'); // Down -> Ctrl-X
+        case 'C':
+            return CTRL_KEY('D'); // Right -> Ctrl-D
+        case 'D':
+            return CTRL_KEY('S'); // Left -> Ctrl-S
+        default:
+            return 0x00; // Ignore other sequences
+        }
+    }
+
+    key_state = KEY_STATE_NORMAL;
+    return 0x00;
 }
 
 // Terminal write function
@@ -37,38 +94,6 @@ static inline uint8_t sense(void)
     return 0x00; // No sense switches on Pico
 }
 
-// Port I/O for disk controller
-static void io_port_out(uint8_t port, uint8_t data)
-{
-    switch (port) {
-        case 0x08:  // Disk select
-            pico_disk_select(data);
-            break;
-        case 0x09:  // Disk control
-            pico_disk_function(data);
-            break;
-        case 0x0A:  // Disk write
-            pico_disk_write(data);
-            break;
-        default:
-            // Other ports - do nothing
-            break;
-    }
-}
-
-static uint8_t io_port_in(uint8_t port)
-{
-    switch (port) {
-        case 0x08:  // Disk status
-            return pico_disk_status();
-        case 0x09:  // Sector position
-            return pico_disk_sector();
-        case 0x0A:  // Disk read
-            return pico_disk_read();
-        default:
-            return 0x00;
-    }
-}
 
 int main(void)
 {

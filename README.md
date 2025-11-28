@@ -20,6 +20,17 @@
     - Exit: Press <kbd>ctrl+a</kbd>, then <kbd>ctrl+x</kbd>
 
 
+## Wi-Fi Console
+
+1. Provide credentials via the new CMake cache variables (preferred):
+    ```shell
+    cmake -B build -DWIFI_SSID="MyNetwork" -DWIFI_PASSWORD="secretpass"
+    ```
+    The values are injected as preprocessor macros. (You can still fall back to defining `PICO_DEFAULT_WIFI_SSID`/`PICO_DEFAULT_WIFI_PASSWORD` elsewhere if you prefer.)
+2. Build and flash as usual. On boot the Pico W connects to Wi-Fi and starts a WebSocket console on port `8082`.
+3. Use any WebSocket-capable client (e.g., a small web page or `wscat`) to connect to `ws://<pico-ip>:8082/` and interact with the Altair terminal alongside USB serial.
+4. USB serial stays active; terminal I/O is mirrored between USB and the WebSocket session.
+
 ## Regenerate Disk Image Header
 
 1. Copy the .dsk file to the disks folder

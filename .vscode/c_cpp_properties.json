@@ -1,0 +1,17 @@
+{
+    "configurations": [
+        {
+            "name": "Pico",
+            "compilerPath": "/usr/bin/clang",
+            "cStandard": "c11",
+            "cppStandard": "c++17",
+            "intelliSenseMode": "macos-clang-x64",
+            "includePath": [
+                "${workspaceFolder}/**",
+                "/Users/dave/GitHub/pico/pico-sdk/**"
+            ],
+            "compileCommands": "${workspaceFolder}/build/compile_commands.json"
+        }
+    ],
+    "version": 4
+}

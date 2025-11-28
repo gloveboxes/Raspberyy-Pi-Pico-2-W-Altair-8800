@@ -1,11 +1,15 @@
 #include "pico/stdlib.h"
 #include "pico/cyw43_arch.h"
+#include "pico/error.h"
 #include <stdio.h>
 #include <string.h>
 #include "Altair8800/intel8080.h"
 #include "Altair8800/memory.h"
 #include "Altair8800/pico_disk.h"
 #include "io_ports.h"
+#include "inky_display.h"
+#include "wifi.h"
+#include "websocket_console.h"
 
 #define ASCII_MASK_7BIT 0x7F
 #define CTRL_KEY(ch) ((ch) & 0x1F)
@@ -28,6 +32,12 @@ static uint8_t terminal_read(void)
     };
 
     static uint8_t key_state = KEY_STATE_NORMAL;
+
+    uint8_t ws_ch = 0;
+    if (websocket_console_try_dequeue_input(&ws_ch))
+    {
+        return ws_ch;
+    }
 
     int c = getchar_timeout_us(0); // Non-blocking read
     if (c == PICO_ERROR_TIMEOUT)
@@ -86,6 +96,7 @@ static void terminal_write(uint8_t c)
 {
     c &= ASCII_MASK_7BIT; // Take first 7 bits only
     putchar(c);
+    websocket_console_enqueue_output(c);
 }
 
 // Sense switches stub
@@ -102,39 +113,57 @@ int main(void)
     // Give more time for USB serial to enumerate
     sleep_ms(3000);
 
-    // Initialise Wi-Fi/BT chip (needed for LED!)
-    bool led_available = false;
-    if (cyw43_arch_init() == 0)
+    inky_display_init();
+
+    bool wifi_connected = wifi_init();
+    char ip_buffer[32] = {0};
+    bool ip_ready = wifi_connected && wifi_get_ip(ip_buffer, sizeof(ip_buffer));
+    if (!ip_ready)
     {
-        led_available = true;
-        // Blink LED to show we're alive
-        cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, 1);
-        sleep_ms(500);
-        cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, 0);
-        sleep_ms(500);
+        strncpy(ip_buffer, wifi_connected ? "Awaiting DHCP" : "No network", sizeof(ip_buffer) - 1);
+        ip_buffer[sizeof(ip_buffer) - 1] = '\0';
     }
 
-    // Wait for user to press Enter (non-blocking check)
-    bool enter_pressed = false;
-    while (!enter_pressed)
+    inky_display_show_status(wifi_get_ssid(), ip_buffer, wifi_connected);
+    bool led_available = wifi_is_ready();
+
+    if (led_available)
     {
-        int c = getchar_timeout_us(100000); // Check every 100ms
-        if (c == '\n' || c == '\r')
-        {
-            enter_pressed = true;
-        }
-        // Blink LED while waiting
-        if (led_available)
-        {
-            static uint32_t blink_count = 0;
-            if (++blink_count % 5 == 0)
-            { // Every 500ms
-                static bool led_on = false;
-                led_on = !led_on;
-                cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, led_on);
-            }
-        }
+        cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, 1);
+        sleep_ms(200);
+        cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, 0);
     }
+
+    if (wifi_connected)
+    {
+        websocket_console_start();
+    }
+    else
+    {
+        printf("Wi-Fi unavailable; USB terminal only.\n");
+    }
+
+    // // Wait for user to press Enter (non-blocking check)
+    // bool enter_pressed = false;
+    // while (!enter_pressed)
+    // {
+    //     int c = getchar_timeout_us(100000); // Check every 100ms
+    //     if (c == '\n' || c == '\r')
+    //     {
+    //         enter_pressed = true;
+    //     }
+    //     // Blink LED while waiting
+    //     if (led_available)
+    //     {
+    //         static uint32_t blink_count = 0;
+    //         if (++blink_count % 5 == 0)
+    //         { // Every 500ms
+    //             static bool led_on = false;
+    //             led_on = !led_on;
+    //             cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, led_on);
+    //         }
+    //     }
+    // }
 
     // Send test output
     printf("\n\n*** USB Serial Active ***\n");

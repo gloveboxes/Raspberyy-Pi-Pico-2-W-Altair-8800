@@ -219,11 +219,11 @@ int main(void)
     printf("Setting CPU to ROM_LOADER_ADDRESS (0xFF00) to boot from disk\n");
     i8080_examine(&cpu, 0xFF00);
 
-    // Report memory usage
+    // Report basic memory usage at startup (static allocation only)
     extern char __StackLimit, __bss_end__;
     extern char __flash_binary_end;
 
-    uint32_t heap_free = &__StackLimit - &__bss_end__;
+    uint32_t heap_free = (uint32_t)(&__StackLimit - &__bss_end__);
     uint32_t total_ram = 512 * 1024; // Pico 2 W has 512KB SRAM
     uint32_t used_ram = total_ram - heap_free;
     uint32_t flash_used = (uint32_t)&__flash_binary_end;

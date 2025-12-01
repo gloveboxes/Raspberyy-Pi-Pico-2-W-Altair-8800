@@ -71,10 +71,10 @@ def main() -> None:
     formatted = format_bytes(data, width=args.width)
 
     header = (
-        f"unsigned char {symbol}[] = {{\n"
+        f"const unsigned char {symbol}[] = {{\n"
         f"{formatted}\n"
         f"}};\n"
-        f"unsigned int {symbol}_len = {len(data)};\n"
+        f"const unsigned int {symbol}_len = {len(data)};\n"
     )
 
     output_path.write_text(header, encoding="ascii")

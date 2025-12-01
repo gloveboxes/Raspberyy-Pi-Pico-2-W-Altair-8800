@@ -2,10 +2,253 @@
 <html>
 
 <head>
-  <script src="Javascript/xterm.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.min.js"></script>
 
-  <link rel="stylesheet" href="css/xterm.css" />
-  <link rel="stylesheet" href="css/modern.css">
+    <style>
+    /* Inlined modern.css */
+    html,
+    input[type=submit],
+    div.find a:active {
+      background-color: #002f00;
+      color: #e5b800;
+    }
+
+    a {
+      background-color: #002f00;
+      color: #e5b800;
+    }
+
+    a:hover {
+      background-color: #002f00;
+      color: #e5b800;
+    }
+
+    #docs {
+      background-color: #002f00;
+      border-width: thick;
+      border: white;
+      font-family: Courier New;
+      font-size: 20px;
+      padding: 1px 1px;
+    }
+
+    input[type=button] {
+      background-color: black;
+      border-color: #e5b800;
+      border-style: solid;
+      border-width: thin;
+      color: #e5b800;
+      cursor: pointer;
+      font-family: Courier New;
+      font-size: 20px;
+      padding: 1px 4px;
+      margin: 2px;
+    }
+
+    input[type=text] {
+      background-color: black;
+      border-color: blue;
+      border-style: solid;
+      border-width: thin;
+      color: #e5b800;
+      font-family: Courier New;
+      font-size: 20px;
+      padding: 1px 1px;
+      text-decoration: none;
+    }
+
+    body {
+      background-color: #002f00;
+      color: #e5b800;
+      font-family: Courier New;
+      font-size: 20px;
+      margin-left: 40px;
+      margin-right: 40px;
+      margin-top: 20px;
+      overflow: hidden;
+      padding: 1rem;
+    }
+
+    #terminal {
+      width: calc(100 * 18px * 0.6 + 4px);
+      border: 2px solid #e5b800;
+      box-sizing: border-box;
+      padding: 0;
+      margin: 0;
+    }
+
+    /* Inlined xterm.css 5.3.0 to ensure the terminal renders when the page
+       is embedded into firmware without external assets. */
+    .xterm {
+      cursor: text;
+      position: relative;
+      user-select: none;
+      -ms-user-select: none;
+      -webkit-user-select: none;
+    }
+
+    .xterm.focus,
+    .xterm:focus {
+      outline: none;
+    }
+
+    .xterm .xterm-helpers {
+      position: absolute;
+      top: 0;
+      z-index: 5;
+    }
+
+    .xterm .xterm-helper-textarea {
+      padding: 0;
+      border: 0;
+      margin: 0;
+      position: absolute;
+      opacity: 0;
+      left: -9999em;
+      top: 0;
+      width: 0;
+      height: 0;
+      z-index: -5;
+      white-space: nowrap;
+      overflow: hidden;
+      resize: none;
+    }
+
+    .xterm .composition-view {
+      background: #000;
+      color: #FFF;
+      display: none;
+      position: absolute;
+      white-space: nowrap;
+      z-index: 1;
+    }
+
+    .xterm .composition-view.active {
+      display: block;
+    }
+
+    .xterm .xterm-viewport {
+      background-color: #000;
+      overflow-y: scroll;
+      cursor: default;
+      position: absolute;
+      right: 0;
+      left: 0;
+      top: 0;
+      bottom: 0;
+    }
+
+    .xterm .xterm-screen {
+      position: relative;
+    }
+
+    .xterm .xterm-screen canvas {
+      position: absolute;
+      left: 0;
+      top: 0;
+    }
+
+    .xterm .xterm-scroll-area {
+      visibility: hidden;
+    }
+
+    .xterm-char-measure-element {
+      display: inline-block;
+      visibility: hidden;
+      position: absolute;
+      top: 0;
+      left: -9999em;
+      line-height: normal;
+    }
+
+    .xterm.enable-mouse-events {
+      cursor: default;
+    }
+
+    .xterm.xterm-cursor-pointer,
+    .xterm .xterm-cursor-pointer {
+      cursor: pointer;
+    }
+
+    .xterm.column-select.focus {
+      cursor: crosshair;
+    }
+
+    .xterm .xterm-accessibility:not(.debug),
+    .xterm .xterm-message {
+      position: absolute;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      right: 0;
+      z-index: 10;
+      color: transparent;
+      pointer-events: none;
+    }
+
+    .xterm .xterm-accessibility-tree:not(.debug) *::selection {
+      color: transparent;
+    }
+
+    .xterm .xterm-accessibility-tree {
+      user-select: text;
+      white-space: pre;
+    }
+
+    .xterm .live-region {
+      position: absolute;
+      left: -9999px;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+    }
+
+    .xterm-dim {
+      opacity: 1 !important;
+    }
+
+    .xterm-underline-1 { text-decoration: underline; }
+    .xterm-underline-2 { text-decoration: double underline; }
+    .xterm-underline-3 { text-decoration: wavy underline; }
+    .xterm-underline-4 { text-decoration: dotted underline; }
+    .xterm-underline-5 { text-decoration: dashed underline; }
+
+    .xterm-overline {
+      text-decoration: overline;
+    }
+
+    .xterm-overline.xterm-underline-1 { text-decoration: overline underline; }
+    .xterm-overline.xterm-underline-2 { text-decoration: overline double underline; }
+    .xterm-overline.xterm-underline-3 { text-decoration: overline wavy underline; }
+    .xterm-overline.xterm-underline-4 { text-decoration: overline dotted underline; }
+    .xterm-overline.xterm-underline-5 { text-decoration: overline dashed underline; }
+
+    .xterm-strikethrough {
+      text-decoration: line-through;
+    }
+
+    .xterm-screen .xterm-decoration-container .xterm-decoration {
+  	z-index: 6;
+  	position: absolute;
+    }
+
+    .xterm-screen .xterm-decoration-container .xterm-decoration.xterm-decoration-top-layer {
+  	z-index: 7;
+    }
+
+    .xterm-decoration-overview-ruler {
+      z-index: 8;
+      position: absolute;
+      top: 0;
+      right: 0;
+      pointer-events: none;
+    }
+
+    .xterm-decoration-top {
+      z-index: 2;
+      position: relative;
+    }
+    </style>
 
   <script>
     "use strict";
@@ -38,7 +281,6 @@
         XTERM_FONT_SIZE: 18,
         XTERM_ROWS: 30,
         XTERM_COLS: 100,
-        WEBSOCKET_PORT: 8082,
         MAX_PASTE_LENGTH: 256,
         STORAGE_THEME_KEY: 'altair_theme',
         DEFAULT_THEME: 'dark',
@@ -425,10 +667,14 @@
             ? sanitizeHostAddress(hostAddress)
             : window.location.hostname || 'localhost';
 
-          return `ws://${altairAddress}:${CONFIG.WEBSOCKET_PORT}`;
+          // Use the same port as the page, or default to 80 if not specified
+          const port = window.location.port || '80';
+
+          return `ws://${altairAddress}:${port}`;
         } catch (error) {
           console.error("Failed to construct WebSocket URL:", error);
-          return `ws://localhost:${CONFIG.WEBSOCKET_PORT}`;
+          const port = window.location.port || '80';
+          return `ws://localhost:${port}`;
         }
       }
 

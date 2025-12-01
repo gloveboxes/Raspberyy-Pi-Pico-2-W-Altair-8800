@@ -8,6 +8,7 @@
 #include "io_ports.h"
 #include "websocket_console.h"
 #include "wifi_config.h"
+#include "build_version.h"
 
 #define ASCII_MASK_7BIT 0x7F
 #define CTRL_KEY(ch) ((ch) & 0x1F)
@@ -139,22 +140,24 @@ static inline uint8_t sense(void)
 // Initialize and configure WiFi
 static void setup_wifi(void)
 {
-#if ALTAIR_ENABLE_WEBSOCKET
-    // Initialize WiFi configuration system
-    wifi_config_init();
 
-    // Always offer WiFi configuration option at startup
+    // WiFi configuration system already initialized in main()
+
+    // Determine timeout based on whether credentials exist
+    uint32_t config_timeout;
     if (wifi_config_exists())
     {
         printf("\nWiFi credentials found in flash storage.\n");
+        config_timeout = 5000; // 5 seconds if credentials exist
     }
     else
     {
         printf("\nNo WiFi credentials found in flash storage.\n");
+        config_timeout = 15000; // 15 seconds if no credentials
     }
 
-    // Always give user the option to configure/update WiFi
-    if (!wifi_config_prompt_and_save(15000)) // 15 second timeout
+    // Give user the option to configure/update WiFi
+    if (!wifi_config_prompt_and_save(config_timeout))
     {
         // User didn't configure, use existing credentials if available
         if (wifi_config_exists())
@@ -192,9 +195,6 @@ static void setup_wifi(void)
         strncpy(ip_buffer, "No network", sizeof(ip_buffer) - 1);
         printf("Wi-Fi unavailable; USB terminal only.\n");
     }
-#else
-    printf("\nBoard does not have WiFi - USB terminal only.\n");
-#endif
 }
 
 int main(void)
@@ -202,16 +202,52 @@ int main(void)
     // Initialize stdio first
     stdio_init_all();
 
-    // Give more time for USB serial to enumerate
-    sleep_ms(5000);
+#if defined(CYW43_WL_GPIO_LED_PIN)
+    // Board has WiFi - check if credentials exist
+    wifi_config_init();
 
-    // Initialize and configure WiFi (if board has WiFi capability)
+    if (!wifi_config_exists())
+    {
+        // No credentials - wait for USB serial connection so user sees WiFi config prompt
+        while (!stdio_usb_connected())
+        {
+            sleep_ms(100);
+        }
+        // Give a brief moment after connection for terminal to be ready
+        sleep_ms(500);
+    }
+    else
+    {
+        // Credentials exist - wait up to 10 seconds for USB connection, then proceed
+        absolute_time_t start_time = get_absolute_time();
+        while (!stdio_usb_connected() && absolute_time_diff_us(start_time, get_absolute_time()) < 10000000)
+        {
+            sleep_ms(100);
+        }
+        // Give a brief moment after connection for terminal to be ready
+        if (stdio_usb_connected())
+        {
+            sleep_ms(500);
+        }
+    }
+
     setup_wifi();
+#else
+    // Board has no WiFi - wait for USB serial connection before proceeding
+    // This ensures we don't miss any output on non-WiFi boards
+    while (!stdio_usb_connected())
+    {
+        sleep_ms(100);
+    }
+    // Give a brief moment after connection for terminal to be ready
+    sleep_ms(500);
+#endif
 
     // Send test output
     printf("\n\n*** USB Serial Active ***\n");
     printf("========================================\n");
     printf("  Altair 8800 Emulator - Pico 2 W\n");
+    printf("  Build: %d (%s %s)\n", BUILD_VERSION, BUILD_DATE, BUILD_TIME);
     printf("========================================\n");
     printf("\n");
 
@@ -263,16 +299,28 @@ int main(void)
     extern char __flash_binary_end;
 
     uint32_t heap_free = (uint32_t)(&__StackLimit - &__bss_end__);
-    uint32_t total_ram = 512 * 1024; // Pico 2 W has 512KB SRAM
+
+    // SDK provides SRAM_BASE and SRAM_END in hardware/regs/addressmap.h
+    // RP2040: 0x20042000 - 0x20000000 = 264 KB
+    // RP2350: 0x20082000 - 0x20000000 = 520 KB
+    uint32_t total_ram = SRAM_END - SRAM_BASE;
     uint32_t used_ram = total_ram - heap_free;
     uint32_t flash_used = (uint32_t)&__flash_binary_end;
 
+    // SDK provides PICO_FLASH_SIZE_BYTES based on board configuration
+#ifndef PICO_FLASH_SIZE_BYTES
+    uint32_t total_flash = 2 * 1024 * 1024; // Default to 2MB
+#else
+    uint32_t total_flash = PICO_FLASH_SIZE_BYTES;
+#endif
+
     printf("\n");
     printf("Memory Report:\n");
-    printf("  Flash used:     %lu bytes (%.1f KB)\n", flash_used, flash_used / 1024.0f);
+    printf("  Flash used:     %lu / %lu bytes (%.1f / %.1f KB)\n",
+           flash_used, total_flash, flash_used / 1024.0f, total_flash / 1024.0f);
     printf("  RAM used:       %lu bytes (%.1f KB)\n", used_ram, used_ram / 1024.0f);
     printf("  RAM free (heap):%lu bytes (%.1f KB)\n", heap_free, heap_free / 1024.0f);
-    printf("  Total SRAM:     %lu bytes (512 KB)\n", total_ram);
+    printf("  Total SRAM:     %lu bytes (%.1f KB)\n", total_ram, total_ram / 1024.0f);
     printf("  Altair memory:  65536 bytes (64 KB)\n");
     printf("\n");
 

@@ -7,11 +7,8 @@
 #include <stdint.h>
 #include <stdio.h>
 
-#ifndef ALTAIR_ENABLE_WEBSOCKET
-#define ALTAIR_ENABLE_WEBSOCKET 0
-#endif
-
-#if ALTAIR_ENABLE_WEBSOCKET
+// Enable WebSocket console only if board has WiFi capability
+#if defined(CYW43_WL_GPIO_LED_PIN)
 
 #include "pico/cyw43_arch.h"
 #include "pico/multicore.h"
@@ -405,7 +402,7 @@ static size_t websocket_console_supply_output(uint8_t *buffer, size_t max_len, v
     return websocket_console_tx_pop(buffer, max_len);
 }
 
-#else // ALTAIR_ENABLE_WEBSOCKET
+#else // No WiFi capability
 
 void websocket_console_start(void)
 {
@@ -440,4 +437,4 @@ bool websocket_console_try_dequeue_input(uint8_t *value)
     return false;
 }
 
-#endif // ALTAIR_ENABLE_WEBSOCKET
+#endif // No WiFi capability

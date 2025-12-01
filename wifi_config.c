@@ -7,9 +7,14 @@
 #include <stdio.h>
 #include <string.h>
 
-// Flash storage offset (last 4KB sector of 4MB flash)
-// Pico 2 W has 4MB flash, so we use offset at 4MB - 4KB
-#define WIFI_CONFIG_FLASH_OFFSET (4 * 1024 * 1024 - FLASH_SECTOR_SIZE)
+// Flash storage offset (last 4KB sector)
+// Pico/Pico W: 2MB flash, Pico 2/Pico 2 W: 4MB flash
+// We detect the actual flash size and use the last sector
+#ifndef PICO_FLASH_SIZE_BYTES
+#define PICO_FLASH_SIZE_BYTES (2 * 1024 * 1024)  // Default to 2MB if not defined
+#endif
+
+#define WIFI_CONFIG_FLASH_OFFSET (PICO_FLASH_SIZE_BYTES - FLASH_SECTOR_SIZE)
 #define WIFI_CONFIG_MAGIC 0x57494649  // "WIFI" in hex
 
 // Simple CRC32 implementation
@@ -239,38 +244,91 @@ bool wifi_config_prompt_and_save(uint32_t timeout_ms)
         return false;
     }
 
-    // Prompt for password
-    printf("Enter WiFi password (max %d characters): ", WIFI_CONFIG_PASSWORD_MAX_LEN);
+    // Prompt for password twice for verification
     char password[WIFI_CONFIG_PASSWORD_MAX_LEN + 1] = {0};
-    size_t password_idx = 0;
+    char password_confirm[WIFI_CONFIG_PASSWORD_MAX_LEN + 1] = {0};
+    bool passwords_match = false;
 
-    while (password_idx < WIFI_CONFIG_PASSWORD_MAX_LEN)
+    while (!passwords_match)
     {
-        int c = getchar_timeout_us(60 * 1000 * 1000);  // 60 second timeout
-        if (c == PICO_ERROR_TIMEOUT)
-        {
-            printf("\nTimeout - WiFi configuration cancelled\n\n");
-            return false;
-        }
+        // First password entry
+        printf("Enter WiFi password (max %d characters): ", WIFI_CONFIG_PASSWORD_MAX_LEN);
+        size_t password_idx = 0;
+        memset(password, 0, sizeof(password));
 
-        if (c == '\r' || c == '\n')
+        while (password_idx < WIFI_CONFIG_PASSWORD_MAX_LEN)
         {
-            printf("\n");
-            break;
-        }
-        else if (c == 0x7F || c == 0x08)  // Backspace/Delete
-        {
-            if (password_idx > 0)
+            int c = getchar_timeout_us(60 * 1000 * 1000);  // 60 second timeout
+            if (c == PICO_ERROR_TIMEOUT)
             {
-                password_idx--;
-                password[password_idx] = '\0';
-                printf("\b \b");  // Erase character from display
+                printf("\nTimeout - WiFi configuration cancelled\n\n");
+                return false;
+            }
+
+            if (c == '\r' || c == '\n')
+            {
+                printf("\n");
+                break;
+            }
+            else if (c == 0x7F || c == 0x08)  // Backspace/Delete
+            {
+                if (password_idx > 0)
+                {
+                    password_idx--;
+                    password[password_idx] = '\0';
+                    printf("\b \b");  // Erase character from display
+                }
+            }
+            else if (c >= 0x20 && c < 0x7F)  // Printable ASCII
+            {
+                password[password_idx++] = (char)c;
+                putchar('*');  // Echo asterisk for password
             }
         }
-        else if (c >= 0x20 && c < 0x7F)  // Printable ASCII
+
+        // Second password entry for confirmation
+        printf("Confirm WiFi password: ");
+        size_t confirm_idx = 0;
+        memset(password_confirm, 0, sizeof(password_confirm));
+
+        while (confirm_idx < WIFI_CONFIG_PASSWORD_MAX_LEN)
         {
-            password[password_idx++] = (char)c;
-            putchar('*');  // Echo asterisk for password
+            int c = getchar_timeout_us(60 * 1000 * 1000);  // 60 second timeout
+            if (c == PICO_ERROR_TIMEOUT)
+            {
+                printf("\nTimeout - WiFi configuration cancelled\n\n");
+                return false;
+            }
+
+            if (c == '\r' || c == '\n')
+            {
+                printf("\n");
+                break;
+            }
+            else if (c == 0x7F || c == 0x08)  // Backspace/Delete
+            {
+                if (confirm_idx > 0)
+                {
+                    confirm_idx--;
+                    password_confirm[confirm_idx] = '\0';
+                    printf("\b \b");  // Erase character from display
+                }
+            }
+            else if (c >= 0x20 && c < 0x7F)  // Printable ASCII
+            {
+                password_confirm[confirm_idx++] = (char)c;
+                putchar('*');  // Echo asterisk for password
+            }
+        }
+
+        // Compare passwords
+        if (strcmp(password, password_confirm) == 0)
+        {
+            passwords_match = true;
+        }
+        else
+        {
+            printf("Error: Passwords do not match. Please try again.\n\n");
         }
     }
 

@@ -5,20 +5,9 @@ if(NOT DEFINED PICO_BOARD)
     set(PICO_BOARD "pico2_w" CACHE STRING "Target Pico board (e.g., pico, pico_w, pico2, pico2_w)" FORCE)
 endif()
 
-# Automatically detect if board has WiFi capabilities
-if(PICO_BOARD STREQUAL "pico_w" OR PICO_BOARD STREQUAL "pico2_w")
-    set(ALTAIR_ENABLE_WEBSOCKET ON)
-    message(STATUS "Board ${PICO_BOARD} has WiFi - enabling WebSocket support")
-else()
-    set(ALTAIR_ENABLE_WEBSOCKET OFF)
-    message(STATUS "Board ${PICO_BOARD} has no WiFi - disabling WebSocket support")
-endif()
-
 # Wi-Fi credentials are configured at runtime via flash storage
 # Use serial console to configure credentials on boot
-
-# Propagate the option to every translation unit so IntelliSense sees it too
-add_compile_definitions(ALTAIR_ENABLE_WEBSOCKET=$<BOOL:${ALTAIR_ENABLE_WEBSOCKET}>)
+# PICO_CYW43_SUPPORTED is automatically set by the SDK based on board type
 
 
 # Use custom mbedtls config from project root
@@ -29,6 +18,23 @@ include($ENV{PICO_SDK_PATH}/external/pico_sdk_import.cmake)
 
 project(altair C CXX ASM)
 pico_sdk_init()
+
+# Generate build version header
+set(VERSION_FILE ${CMAKE_CURRENT_LIST_DIR}/build_version.txt)
+set(TEMPLATE_FILE ${CMAKE_CURRENT_LIST_DIR}/build_version.h.in)
+set(OUTPUT_FILE ${CMAKE_CURRENT_BINARY_DIR}/build_version.h)
+
+add_custom_target(generate_version
+    COMMAND ${CMAKE_COMMAND}
+        -DVERSION_FILE=${VERSION_FILE}
+        -DTEMPLATE_FILE=${TEMPLATE_FILE}
+        -DOUTPUT_FILE=${OUTPUT_FILE}
+        $<$<BOOL:${SKIP_VERSION_INCREMENT}>:-DSKIP_VERSION_INCREMENT=1>
+        -P ${CMAKE_CURRENT_LIST_DIR}/generate_version.cmake
+    BYPRODUCTS ${OUTPUT_FILE}
+    COMMENT "Generating build version header"
+    VERBATIM
+)
 
 add_library(lwipopts_provider INTERFACE)
 target_include_directories(lwipopts_provider INTERFACE ${CMAKE_CURRENT_LIST_DIR})
@@ -47,7 +53,7 @@ set(ALTAIR_SOURCES
 
 set(ALTAIR_LIBS)
 
-if(ALTAIR_ENABLE_WEBSOCKET)
+if(PICO_CYW43_SUPPORTED)
     set(PICO_WS_SERVER_DIR ${CMAKE_CURRENT_LIST_DIR}/lib/pico-ws-server)
 
     add_library(pico_ws_server
@@ -88,24 +94,24 @@ endif()
 
 add_executable(altair ${ALTAIR_SOURCES})
 
+# Ensure build version is generated before compiling
+add_dependencies(altair generate_version)
+
 # Make sure all CYW43 headers are visible and include Altair8800 directory
 target_include_directories(altair PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}
     ${CMAKE_CURRENT_LIST_DIR}/Altair8800
     ${CMAKE_CURRENT_LIST_DIR}/PortDrivers
+    ${CMAKE_CURRENT_BINARY_DIR}
 )
 
-if(ALTAIR_ENABLE_WEBSOCKET)
+if(PICO_CYW43_SUPPORTED)
     target_include_directories(altair PRIVATE
         ${PICO_SDK_PATH}/src/rp2_common/pico_cyw43_arch/include
         ${PICO_SDK_PATH}/src/rp2_common/pico_cyw43_driver/include
         ${PICO_SDK_PATH}/lib/cyw43-driver/src        # 👈 this one is for cyw43.h
     )
 endif()
-
-target_compile_definitions(altair PRIVATE
-    ALTAIR_ENABLE_WEBSOCKET=$<BOOL:${ALTAIR_ENABLE_WEBSOCKET}>
-)
 
 # USB stdio on, UART stdio off
 pico_enable_stdio_usb(altair 1)
@@ -120,7 +126,7 @@ target_link_libraries(altair
     ${ALTAIR_LIBS}
 )
 
-if(ALTAIR_ENABLE_WEBSOCKET)
+if(PICO_CYW43_SUPPORTED)
     target_link_libraries(altair pico_cyw43_arch_lwip_poll)
 endif()
 

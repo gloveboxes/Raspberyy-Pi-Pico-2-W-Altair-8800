@@ -16,6 +16,20 @@ NC='\033[0m' # No Color
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
+# Increment build version once at the start
+VERSION_FILE="${SCRIPT_DIR}/build_version.txt"
+if [ -f "$VERSION_FILE" ]; then
+    CURRENT_VERSION=$(cat "$VERSION_FILE")
+    NEW_VERSION=$((CURRENT_VERSION + 1))
+    echo "$NEW_VERSION" > "$VERSION_FILE"
+    echo -e "${GREEN}Build version incremented: ${CURRENT_VERSION} -> ${NEW_VERSION}${NC}"
+else
+    echo "1" > "$VERSION_FILE"
+    NEW_VERSION=1
+    echo -e "${GREEN}Build version initialized: ${NEW_VERSION}${NC}"
+fi
+echo ""
+
 # Array of boards to test
 BOARDS=("pico" "pico_w" "pico2" "pico2_w")
 
@@ -40,10 +54,10 @@ for BOARD in "${BOARDS[@]}"; do
     
     BUILD_START=$(date +%s)
     
-    # Clean and build
+    # Clean and build (skip version increment since we did it once at the start)
     rm -rf build
     
-    if cmake -B build -DCMAKE_BUILD_TYPE=Release -DPICO_BOARD="$BOARD" && \
+    if cmake -B build -DCMAKE_BUILD_TYPE=Release -DPICO_BOARD="$BOARD" -DSKIP_VERSION_INCREMENT=1 && \
        cmake --build build -- -j; then
         
         BUILD_END=$(date +%s)

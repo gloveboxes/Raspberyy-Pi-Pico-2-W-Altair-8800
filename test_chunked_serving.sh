@@ -3,7 +3,7 @@
 # Test script for chunked HTTP serving
 # Tests that the web server consistently returns the same content size
 
-DEVICE_URL="http://192.168.1.112:8088/"
+DEVICE_URL="http://192.168.1.119:8088/"
 ITERATIONS=100000
 TEMP_FILE=$(mktemp)
 

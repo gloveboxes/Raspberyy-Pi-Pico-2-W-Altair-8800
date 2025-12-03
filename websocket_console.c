@@ -338,10 +338,16 @@ static void websocket_console_core1_entry(void)
     printf("[Core1] WebSocket server running, entering poll loop\n");
 
     // Main poll loop - all CYW43/lwIP access stays on core 1
+    int counter = 0;
     while (true)
     {
         cyw43_arch_poll();
-        ws_poll();
+        ws_poll_incoming();
+        if (++counter >= 2000)
+        {
+            counter = 0;
+            ws_poll_outgoing();
+        }
         tight_loop_contents();
     }
 }

@@ -10,8 +10,7 @@ namespace
 {
     static constexpr uint16_t WS_SERVER_PORT = 8088;
     static constexpr uint32_t WS_MAX_CLIENTS = 1;
-    static constexpr size_t WS_FRAME_PAYLOAD = 4;
-    static constexpr size_t WS_MAX_FRAMES_PER_POLL = 8;
+    static constexpr size_t WS_FRAME_PAYLOAD = 128;
 
     struct ws_context_t
     {
@@ -108,6 +107,7 @@ extern "C"
             g_ws_server->setConnectCallback(handle_connect);
             g_ws_server->setCloseCallback(handle_close);
             g_ws_server->setMessageCallback(handle_message);
+            g_ws_server->setTcpNoDelay(true);  // Disable Nagle's algorithm for low latency
         }
 
         g_ws_active_clients = 0;
@@ -134,14 +134,27 @@ extern "C"
         return g_ws_active_clients > 0;
     }
 
-    void ws_poll(void)
+    void ws_poll_incoming(void)
     {
         if (!g_ws_running || !g_ws_server)
         {
             return;
         }
 
+        if (g_ws_active_clients == 0 || !g_ws_context.callbacks.on_output)
+        {
+            return;
+        }
+
         g_ws_server->popMessages();
+    }
+
+    void ws_poll_outgoing(void)
+    {
+        if (!g_ws_running || !g_ws_server)
+        {
+            return;
+        }
 
         if (g_ws_active_clients == 0 || !g_ws_context.callbacks.on_output)
         {
@@ -150,14 +163,18 @@ extern "C"
 
         uint8_t payload[WS_FRAME_PAYLOAD];
 
-        for (size_t frame = 0; frame < WS_MAX_FRAMES_PER_POLL; ++frame)
+        size_t payload_len = g_ws_context.callbacks.on_output(payload, sizeof(payload), g_ws_context.callbacks.user_data);
+        if (payload_len == 0)
         {
-            size_t payload_len = g_ws_context.callbacks.on_output(payload, sizeof(payload), g_ws_context.callbacks.user_data);
-            if (payload_len == 0)
-            {
-                break;
-            }
-            g_ws_server->broadcastMessage(payload, payload_len);
+            return;
+        }
+        
+        printf("WebSocket sending %zu bytes\n", payload_len);
+        if (!g_ws_server->broadcastMessage(payload, payload_len))
+        {
+            // Send failed - likely due to full send buffer or network congestion
+            // For real-time terminal output, we drop the data rather than queue it
+            printf("WebSocket send failed, dropping %zu bytes\n", payload_len);
         }
     }
 }

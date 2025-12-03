@@ -25,7 +25,8 @@ extern "C"
 void ws_init(const ws_callbacks_t *callbacks);
 bool ws_start(void);
 bool ws_is_running(void);
-void ws_poll(void);
+void ws_poll_incoming(void);
+void ws_poll_outgoing(void);
 bool ws_has_active_clients(void);
 
 #ifdef __cplusplus

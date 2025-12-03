@@ -4,6 +4,8 @@
   "cmake.configureOnOpen": true,
   "files.associations": {
     "stdio.h": "c",
-    "list": "cpp"
+    "list": "cpp",
+    "__verbose_abort": "c",
+    "cstdio": "c"
   }
 }

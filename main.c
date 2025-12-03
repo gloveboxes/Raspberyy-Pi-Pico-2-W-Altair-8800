@@ -14,7 +14,7 @@
 #define CTRL_KEY(ch) ((ch) & 0x1F)
 
 // Include the CPM disk image
-#include "Altair8800/cpm63k_disk.h"
+#include "Disks/cpm63k_disk.h"
 
 // Global CPU instance
 static intel8080_t cpu;

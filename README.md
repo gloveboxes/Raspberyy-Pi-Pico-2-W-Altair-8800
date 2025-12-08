@@ -1,5 +1,9 @@
 # Raspberry Pi Pico Altair 8800
 
+## Project Heritage
+
+This project is a microcontroller implementation of the [Altair 8800 Emulator on Embedded Linux](https://github.com/gloveboxes/Altair-8800-Emulator).
+
 ## Clone With Submodules
 
 This project bundles Pimoroni's Pico helper libraries as a git submodule.

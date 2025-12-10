@@ -8,10 +8,6 @@
 // Call this once from main(); it returns immediately while core1 runs in the background.
 void websocket_console_start(void);
 
-// Block until core 1 completes Wi-Fi initialization.
-// Returns 0 on failure, or raw 32-bit IP address on success.
-uint32_t websocket_console_wait_for_wifi(void);
-
 // Enqueue a byte from the emulator (core 0) to be sent to WebSocket clients.
 void websocket_console_enqueue_output(uint8_t value);
 
@@ -23,3 +19,15 @@ bool websocket_console_is_running(void);
 
 // Get the IP address string (valid after Wi-Fi connects). Returns false if not ready.
 bool websocket_console_get_ip(char *buffer, size_t length);
+
+// Poll the WebSocket server for incoming and outgoing messages (internal use)
+void ws_poll(void);
+
+// Initialize WebSocket queues (internal use)
+void websocket_queue_init(void);
+
+// WebSocket callback functions (internal use)
+bool websocket_console_handle_input(const uint8_t *payload, size_t payload_len, void *user_data);
+size_t websocket_console_supply_output(uint8_t *buffer, size_t max_len, void *user_data);
+void websocket_console_on_client_connected(void *user_data);
+void websocket_console_on_client_disconnected(void *user_data);

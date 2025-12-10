@@ -4,7 +4,7 @@
         {
             "label": "Build for Pico (Release)",
             "type": "shell",
-            "command": "rm -rf build && cmake -B build -DCMAKE_BUILD_TYPE=Release -DPICO_BOARD=pico && cmake --build build -- -j && mkdir -p deploy && cp build/altair.uf2 deploy/altair_pico.uf2",
+            "command": "rm -rf build && cmake -B build -DCMAKE_BUILD_TYPE=Release -DPICO_BOARD=pico && cmake --build build -- -j && mkdir -p Releases && cp build/altair.uf2 Releases/altair_pico.uf2",
             "options": {
                 "cwd": "${workspaceFolder}"
             },
@@ -16,7 +16,7 @@
         {
             "label": "Build for Pico W (Release)",
             "type": "shell",
-            "command": "rm -rf build && cmake -B build -DCMAKE_BUILD_TYPE=Release -DPICO_BOARD=pico_w && cmake --build build -- -j && mkdir -p deploy && cp build/altair.uf2 deploy/altair_pico_w.uf2",
+            "command": "rm -rf build && cmake -B build -DCMAKE_BUILD_TYPE=Release -DPICO_BOARD=pico_w && cmake --build build -- -j && mkdir -p Releases && cp build/altair.uf2 Releases/altair_pico_w.uf2",
             "options": {
                 "cwd": "${workspaceFolder}"
             },
@@ -28,7 +28,7 @@
         {
             "label": "Build for Pico 2 (Release)",
             "type": "shell",
-            "command": "rm -rf build && cmake -B build -DCMAKE_BUILD_TYPE=Release -DPICO_BOARD=pico2 && cmake --build build -- -j && mkdir -p deploy && cp build/altair.uf2 deploy/altair_pico2.uf2",
+            "command": "rm -rf build && cmake -B build -DCMAKE_BUILD_TYPE=Release -DPICO_BOARD=pico2 && cmake --build build -- -j && mkdir -p Releases && cp build/altair.uf2 Releases/altair_pico2.uf2",
             "options": {
                 "cwd": "${workspaceFolder}"
             },
@@ -40,7 +40,7 @@
         {
             "label": "Build for Pico 2 W (Release)",
             "type": "shell",
-            "command": "rm -rf build && cmake -B build -DCMAKE_BUILD_TYPE=Release -DPICO_BOARD=pico2_w && cmake --build build -- -j && mkdir -p deploy && cp build/altair.uf2 deploy/altair_pico2_w.uf2",
+            "command": "rm -rf build && cmake -B build -DCMAKE_BUILD_TYPE=Release -DPICO_BOARD=pico2_w && cmake --build build -- -j && mkdir -p Releases && cp build/altair.uf2 Releases/altair_pico2_w.uf2",
             "options": {
                 "cwd": "${workspaceFolder}"
             },
@@ -55,7 +55,7 @@
         {
             "label": "Build for Pimoroni Pico Plus 2W (Release)",
             "type": "shell",
-            "command": "rm -rf build && cmake -B build -DCMAKE_BUILD_TYPE=Release -DPICO_BOARD=pimoroni_pico_plus2_w_rp2350 && cmake --build build -- -j && mkdir -p deploy && cp build/altair.uf2 deploy/altair_pimoroni_pico_plus2_w_rp2350.uf2",
+            "command": "rm -rf build && cmake -B build -DCMAKE_BUILD_TYPE=Release -DPICO_BOARD=pimoroni_pico_plus2_w_rp2350 && cmake --build build -- -j && mkdir -p Releases && cp build/altair.uf2 Releases/altair_pimoroni_pico_plus2_w_rp2350.uf2",
             "options": {
                 "cwd": "${workspaceFolder}"
             },
@@ -67,7 +67,7 @@
         {
             "label": "Build All Boards (Release)",
             "type": "shell",
-            "command": "./build_all_boards.sh && mkdir -p deploy && cp tests/pico/altair_pico.uf2 deploy/ && cp tests/pico_w/altair_pico_w.uf2 deploy/ && cp tests/pico2/altair_pico2.uf2 deploy/ && cp tests/pico2_w/altair_pico2_w.uf2 deploy/ && cp tests/pimoroni_pico_plus2_w_rp2350/altair_pimoroni_pico_plus2_w_rp2350.uf2 deploy/",
+            "command": "./build_all_boards.sh && mkdir -p Releases && cp tests/pico/altair_pico.uf2 Releases/ && cp tests/pico_w/altair_pico_w.uf2 Releases/ && cp tests/pico2/altair_pico2.uf2 Releases/ && cp tests/pico2_w/altair_pico2_w.uf2 Releases/ && cp tests/pimoroni_pico_plus2_w_rp2350/altair_pimoroni_pico_plus2_w_rp2350.uf2 Releases/",
             "options": {
                 "cwd": "${workspaceFolder}"
             },

@@ -121,7 +121,7 @@ WebSocket support is automatically enabled for WiFi-capable boards (`pico_w` and
 3. Select the desired build task
 
 Build artifacts are saved to:
-- Individual board builds: `deploy/altair_{board}.uf2`
+- Individual board builds: `Releases/altair_{board}.uf2`
 - All boards build: `tests/{board}/altair_{board}.uf2`
 
 ### Manual Build Commands

@@ -6,7 +6,7 @@
 #include "Altair8800/memory.h"
 #include "Altair8800/pico_disk.h"
 #include "io_ports.h"
-#include "websocket_console.h"
+#include "comms_mgr.h"
 #include "wifi_config.h"
 #include "build_version.h"
 

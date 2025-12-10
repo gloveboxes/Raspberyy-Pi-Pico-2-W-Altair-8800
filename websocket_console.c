@@ -1,34 +1,21 @@
 #include "websocket_console.h"
 
-#include "pico/stdlib.h"
-
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <string.h>
+
+#include "pico/multicore.h"
+#include "pico/mutex.h"
+#include "pico/stdlib.h"
+#include "pico/util/queue.h"
+
+#include "ws.h"
 
 // Enable WebSocket console only if board has WiFi capability
 #if defined(CYW43_WL_GPIO_LED_PIN)
 
-#include "pico/cyw43_arch.h"
-#include "pico/multicore.h"
-#include "pico/util/queue.h"
-#include "pico/mutex.h"
-
-#include "lwip/ip4_addr.h"
-#include "lwip/netif.h"
-#include "cyw43.h"
-
-#include "ws.h"
-#include "wifi_config.h"
-
-#include <string.h>
-
-#ifndef WIFI_AUTH
-#define WIFI_AUTH CYW43_AUTH_WPA2_AES_PSK
-#endif
-
-#define WIFI_CONNECT_TIMEOUT_MS 30000
 #define WS_RX_QUEUE_DEPTH 128
 #define WS_TX_BUFFER_SIZE 1024
 
@@ -37,17 +24,7 @@ static uint8_t ws_tx_buffer[WS_TX_BUFFER_SIZE];
 static size_t ws_tx_head = 0;
 static size_t ws_tx_tail = 0;
 static mutex_t ws_tx_lock;
-static volatile bool console_initialized = false;
-static volatile bool console_running = false;
-static volatile bool wifi_connected = false;
-static char ip_address_buffer[32] = {0};
 
-static void websocket_console_core1_entry(void);
-static bool websocket_console_wifi_init(void);
-static bool websocket_console_handle_input(const uint8_t *payload, size_t payload_len, void *user_data);
-static size_t websocket_console_supply_output(uint8_t *buffer, size_t max_len, void *user_data);
-static void websocket_console_on_client_connected(void *user_data);
-static void websocket_console_on_client_disconnected(void *user_data);
 static void websocket_console_clear_tx_buffer(void);
 static void websocket_console_clear_queues(void);
 
@@ -124,60 +101,16 @@ static void websocket_console_clear_tx_buffer(void)
     mutex_exit(&ws_tx_lock);
 }
 
-void websocket_console_start(void)
+void websocket_queue_init(void)
 {
-    if (console_running)
-    {
-        return;
-    }
 
     // Initialize mutex and queues on core 0 before launching core 1
     mutex_init(&ws_tx_lock);
     queue_init(&ws_rx_queue, sizeof(uint8_t), WS_RX_QUEUE_DEPTH);
-
-    // Launch core 1 which will handle all Wi-Fi and WebSocket operations
-    multicore_launch_core1(websocket_console_core1_entry);
-    console_running = true;
-    printf("Launched network task on core 1\n");
-}
-
-uint32_t websocket_console_wait_for_wifi(void)
-{
-    // Block until core 1 signals Wi-Fi init complete
-    // Returns 0 on failure, or raw 32-bit IP address on success
-    return multicore_fifo_pop_blocking();
-}
-
-bool websocket_console_is_running(void)
-{
-    return console_running && wifi_connected && ws_is_running();
-}
-
-bool websocket_console_get_ip(char *buffer, size_t length)
-{
-    if (!wifi_connected || !buffer || length == 0)
-    {
-        return false;
-    }
-
-    size_t ip_len = strlen(ip_address_buffer);
-    if (ip_len == 0 || ip_len >= length)
-    {
-        return false;
-    }
-
-    strncpy(buffer, ip_address_buffer, length - 1);
-    buffer[length - 1] = '\0';
-    return true;
 }
 
 void websocket_console_enqueue_output(uint8_t value)
 {
-    if (!console_initialized)
-    {
-        return;
-    }
-
     if (!ws_has_active_clients())
     {
         websocket_console_clear_tx_buffer();
@@ -189,132 +122,21 @@ void websocket_console_enqueue_output(uint8_t value)
 
 bool websocket_console_try_dequeue_input(uint8_t *value)
 {
-    if (!console_initialized || !value)
-    {
-        return false;
-    }
-
     return queue_try_remove(&ws_rx_queue, value);
 }
 
-static bool websocket_console_wifi_init(void)
+void ws_poll(void)
 {
-    printf("[Core1] Initializing CYW43...\n");
-    if (cyw43_arch_init())
+    static int counter = 0;
+    ws_poll_incoming();
+    if (++counter >= 2000)
     {
-        printf("[Core1] CYW43 init failed\n");
-        return false;
-    }
-
-    cyw43_arch_enable_sta_mode();
-
-    // Load credentials from flash storage
-    char ssid[WIFI_CONFIG_SSID_MAX_LEN + 1] = {0};
-    char password[WIFI_CONFIG_PASSWORD_MAX_LEN + 1] = {0};
-    bool credentials_loaded = wifi_config_load(ssid, sizeof(ssid), password, sizeof(password));
-
-    // Check if credentials were loaded successfully
-    if (!credentials_loaded || ssid[0] == '\0')
-    {
-        printf("[Core1] No WiFi credentials configured, Wi-Fi unavailable\n");
-        return false;
-    }
-
-    printf("[Core1] Using stored credentials from flash\n");
-
-    printf("[Core1] Connecting to Wi-Fi SSID '%s'...\n", ssid);
-
-    int err = cyw43_arch_wifi_connect_timeout_ms(
-        ssid,
-        password,
-        WIFI_AUTH,
-        WIFI_CONNECT_TIMEOUT_MS);
-
-    if (err != 0)
-    {
-        printf("[Core1] Wi-Fi connect failed (err=%d)\n", err);
-        return false;
-    }
-
-    // Get and store IP address
-    struct netif *netif = netif_default;
-    if (netif && netif_is_up(netif))
-    {
-        const ip4_addr_t *addr = netif_ip4_addr(netif);
-        if (addr)
-        {
-            ip4addr_ntoa_r(addr, ip_address_buffer, sizeof(ip_address_buffer));
-        }
-    }
-
-    printf("[Core1] Wi-Fi connected. IP: %s\n", ip_address_buffer);
-    return true;
-}
-
-static void websocket_console_core1_entry(void)
-{
-    // Initialize Wi-Fi on core 1
-    bool wifi_ok = websocket_console_wifi_init();
-    wifi_connected = wifi_ok;
-
-    // Signal core 0: send 0 for failure, or raw IP address (32-bit) for success
-    uint32_t ip_raw = 0;
-    if (wifi_ok)
-    {
-        struct netif *netif = netif_default;
-        if (netif && netif_is_up(netif))
-        {
-            const ip4_addr_t *addr = netif_ip4_addr(netif);
-            if (addr)
-            {
-                ip_raw = ip4_addr_get_u32(addr);
-            }
-        }
-    }
-    multicore_fifo_push_blocking(ip_raw);
-
-    if (!wifi_ok)
-    {
-        printf("[Core1] Wi-Fi unavailable, network task exiting\n");
-        return;
-    }
-
-    // Initialize and start WebSocket server
-    ws_callbacks_t callbacks = {
-        .on_receive = websocket_console_handle_input,
-        .on_output = websocket_console_supply_output,
-        .on_client_connected = websocket_console_on_client_connected,
-        .on_client_disconnected = websocket_console_on_client_disconnected,
-        .user_data = NULL,
-    };
-    ws_init(&callbacks);
-
-    if (!ws_start())
-    {
-        printf("[Core1] Failed to start WebSocket server\n");
-        return;
-    }
-
-    // Mark console as initialized only after successful network stack initialization
-    console_initialized = true;
-    printf("[Core1] WebSocket server running, entering poll loop\n");
-
-    // Main poll loop - all CYW43/lwIP access stays on core 1
-    int counter = 0;
-    while (true)
-    {
-        cyw43_arch_poll();
-        ws_poll_incoming();
-        if (++counter >= 2000)
-        {
-            counter = 0;
-            ws_poll_outgoing();
-        }
-        tight_loop_contents();
+        counter = 0;
+        ws_poll_outgoing();
     }
 }
 
-static bool websocket_console_handle_input(const uint8_t *payload, size_t payload_len, void *user_data)
+bool websocket_console_handle_input(const uint8_t *payload, size_t payload_len, void *user_data)
 {
     (void)user_data;
 
@@ -343,12 +165,12 @@ static bool websocket_console_handle_input(const uint8_t *payload, size_t payloa
     return true;
 }
 
-static void websocket_console_on_client_connected(void *user_data)
+void websocket_console_on_client_connected(void *user_data)
 {
     (void)user_data;
 }
 
-static void websocket_console_on_client_disconnected(void *user_data)
+void websocket_console_on_client_disconnected(void *user_data)
 {
     (void)user_data;
     websocket_console_clear_queues();
@@ -364,35 +186,13 @@ static void websocket_console_clear_queues(void)
     }
 }
 
-static size_t websocket_console_supply_output(uint8_t *buffer, size_t max_len, void *user_data)
+size_t websocket_console_supply_output(uint8_t *buffer, size_t max_len, void *user_data)
 {
     (void)user_data;
     return websocket_console_tx_pop(buffer, max_len);
 }
 
 #else // No WiFi capability
-
-void websocket_console_start(void)
-{
-    printf("WebSocket console disabled; USB serial only.\n");
-}
-
-uint32_t websocket_console_wait_for_wifi(void)
-{
-    return 0;
-}
-
-bool websocket_console_is_running(void)
-{
-    return false;
-}
-
-bool websocket_console_get_ip(char *buffer, size_t length)
-{
-    (void)buffer;
-    (void)length;
-    return false;
-}
 
 void websocket_console_enqueue_output(uint8_t value)
 {

@@ -49,6 +49,7 @@ set(ALTAIR_SOURCES
     PortDrivers/utility_io.c
     websocket_console.c
     wifi_config.c
+    comms_mgr.c
 )
 
 set(ALTAIR_LIBS)

@@ -138,3 +138,62 @@ rm -rf build && cmake -B build -DCMAKE_BUILD_TYPE=Release -DPICO_BOARD=pico2 && 
 # Build for all boards
 ./build_all_boards.sh
 ```
+
+
+## Install the Pico Toolchain
+
+1. Download the [Arm GNU Toolchain](https://developer.arm.com/downloads/-/arm-gnu-toolchain-downloads) and install.
+2. Create a `pico` folder in your `src` or `GitHub` folder
+3. Change to the `pico` folder
+4. Clone the [Pico SDK](https://github.com/raspberrypi/pico-sdk.git)
+
+    ```shell
+    git clone --recurse-submodules https://github.com/raspberrypi/pico-sdk.git
+    ```
+
+
+5. Update your `~/.zprofile` file
+
+    ```text
+    # Raspberry Pi Pico SDK
+    export PICO_SDK_PATH=$HOME/GitHub/pico/pico-sdk
+
+    # ARM GNU Toolchain
+    export PICO_TOOLCHAIN_PATH="/Applications/ArmGNUToolchain/14.3.rel1/arm-none-eabi"
+    export PATH="/Applications/ArmGNUToolchain/14.3.rel1/arm-none-eabi/bin:$PATH"
+    ```
+
+6. Reload the `.zprofile`
+
+    ```shell
+    source ~/.zprofile
+    ```
+
+## Install Install Xcode Command Line Tools
+
+```shell
+xcode-select --install
+```
+
+## Install CMake tools
+
+```shell
+brew install cmake
+```
+
+Verify installation
+
+```shell
+cmake --version
+```
+
+## Install Ninja
+
+```shell
+brew install ninja
+```
+
+## Install the VS Code Pico Extension
+
+[Raspberry Pi Pico](https://marketplace.visualstudio.com/items?itemName=raspberry-pi.raspberry-pi-pico)
+

@@ -10,9 +10,7 @@ This project bundles Pimoroni's Pico helper libraries as a git submodule.
 Clone (or update) with:
 
 ```shell
-git clone --recurse-submodules https://github.com/gloveboxes/Raspberyy-Pi-Pico-2-W-Altair-8800.git
-# or, if already cloned
-git submodule update --init --recursive
+git clone --recurse-submodules https://github.com/gloveboxes/Raspberry-Pi-Pico-Altair-8800.git
 ```
 
 ## Serial Terminal
@@ -145,14 +143,13 @@ rm -rf build && cmake -B build -DCMAKE_BUILD_TYPE=Release -DPICO_BOARD=pico2 && 
 1. Download the [Arm GNU Toolchain](https://developer.arm.com/downloads/-/arm-gnu-toolchain-downloads) and install.
 2. Create a `pico` folder in your `src` or `GitHub` folder
 3. Change to the `pico` folder
-4. Clone the [Pico SDK](https://github.com/raspberrypi/pico-sdk.git)
 
     ```shell
     git clone --recurse-submodules https://github.com/raspberrypi/pico-sdk.git
     ```
 
 
-5. Update your `~/.zprofile` file
+4. Update your `~/.zprofile` file
 
     ```text
     # Raspberry Pi Pico SDK
@@ -163,7 +160,7 @@ rm -rf build && cmake -B build -DCMAKE_BUILD_TYPE=Release -DPICO_BOARD=pico2 && 
     export PATH="/Applications/ArmGNUToolchain/14.3.rel1/arm-none-eabi/bin:$PATH"
     ```
 
-6. Reload the `.zprofile`
+5. Reload the `.zprofile`
 
     ```shell
     source ~/.zprofile

@@ -9,10 +9,6 @@ endif()
 # Use serial console to configure credentials on boot
 # PICO_CYW43_SUPPORTED is automatically set by the SDK based on board type
 
-
-# Use custom mbedtls config from project root
-set(PICO_MBEDTLS_CONFIG_FILE "${CMAKE_CURRENT_LIST_DIR}/mbedtls_config.h" CACHE FILEPATH "Custom mbedTLS config")
-
 # Import Pico SDK
 include($ENV{PICO_SDK_PATH}/external/pico_sdk_import.cmake)
 
@@ -74,11 +70,6 @@ if(PICO_CYW43_SUPPORTED)
     )
 
     target_compile_definitions(pico_ws_server PUBLIC DEBUG_PRINT=0)
-
-    # Add compatibility header for mbedtls API changes
-    target_compile_options(pico_ws_server PRIVATE
-        $<$<COMPILE_LANGUAGE:CXX>:-include${CMAKE_CURRENT_LIST_DIR}/mbedtls_compat.h>
-    )
 
     target_link_libraries(pico_ws_server
         PUBLIC

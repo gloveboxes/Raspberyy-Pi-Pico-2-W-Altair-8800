@@ -10,7 +10,7 @@ This project bundles Pimoroni's Pico helper libraries as a git submodule.
 Clone (or update) with:
 
 ```shell
-git clone --recurse-submodules https://github.com/gloveboxes/Raspberry-Pi-Pico-Altair-8800.git
+git clone --recurse-submodules https://github.com/gloveboxes/pico-altair-8800.git
 ```
 
 ## Serial Terminal

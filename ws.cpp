@@ -10,7 +10,12 @@
 namespace
 {
     static constexpr uint16_t WS_SERVER_PORT = 8088;
-    static constexpr uint32_t WS_MAX_CLIENTS = 1;
+    static constexpr uint32_t WS_MAX_CLIENTS = 2;
+    // The pico-ws-server `max_connections` limit counts *all* TCP connections (including
+    // non-upgraded HTTP connections used to serve the UI). Keep this higher than
+    // WS_MAX_CLIENTS to avoid RSTs during the WebSocket handshake when a browser
+    // holds an HTTP keep-alive connection open.
+    static constexpr uint32_t WS_SERVER_MAX_CONNECTIONS = 8;
     static constexpr size_t WS_FRAME_PAYLOAD = 256;
     static constexpr uint32_t WS_PING_INTERVAL_MS = 5000;
     static constexpr uint8_t WS_MAX_MISSED_PONGS = 3;
@@ -20,83 +25,125 @@ namespace
         ws_callbacks_t callbacks;
     };
 
+    struct ws_connection_state_t
+    {
+        uint32_t conn_id;
+        absolute_time_t next_ping_deadline;
+        uint8_t pending_pings;
+        uint8_t missed_pongs;
+        bool active;
+        bool closing;
+    };
+
     static ws_context_t g_ws_context = {};
     static bool g_ws_initialized = false;
     static bool g_ws_running = false;
     static size_t g_ws_active_clients = 0;
     static std::unique_ptr<WebSocketServer> g_ws_server;
-    static uint32_t g_ws_last_conn_id = 0;
-    static absolute_time_t g_ws_next_ping_deadline;
-    static uint8_t g_ws_pending_pings = 0;
-    static uint8_t g_ws_missed_pongs = 0;
+    static ws_connection_state_t g_ws_connections[WS_MAX_CLIENTS] = {};
 
-    static inline void reset_ping_state(void)
+    static ws_connection_state_t* find_connection(uint32_t conn_id)
     {
-        g_ws_pending_pings = 0;
-        g_ws_missed_pongs = 0;
-        g_ws_next_ping_deadline = make_timeout_time_ms(WS_PING_INTERVAL_MS);
+        for (size_t i = 0; i < WS_MAX_CLIENTS; ++i)
+        {
+            if (g_ws_connections[i].active && g_ws_connections[i].conn_id == conn_id)
+            {
+                return &g_ws_connections[i];
+            }
+        }
+        return nullptr;
     }
 
-    static inline void mark_connection_closed(void)
+    static ws_connection_state_t* allocate_connection(uint32_t conn_id)
     {
-        g_ws_active_clients = 0;
-        g_ws_last_conn_id = 0;
-        reset_ping_state();
+        for (size_t i = 0; i < WS_MAX_CLIENTS; ++i)
+        {
+            if (!g_ws_connections[i].active)
+            {
+                g_ws_connections[i].conn_id = conn_id;
+                g_ws_connections[i].active = true;
+                g_ws_connections[i].closing = false;
+                g_ws_connections[i].pending_pings = 0;
+                g_ws_connections[i].missed_pongs = 0;
+                g_ws_connections[i].next_ping_deadline = make_timeout_time_ms(WS_PING_INTERVAL_MS);
+                return &g_ws_connections[i];
+            }
+        }
+        return nullptr;
     }
 
     static void send_ping_if_due(void)
     {
-        if (!g_ws_running || !g_ws_server || g_ws_active_clients == 0 || g_ws_last_conn_id == 0)
+        if (!g_ws_running || !g_ws_server || g_ws_active_clients == 0)
         {
             return;
         }
 
         absolute_time_t now = get_absolute_time();
-        // Run only when now has reached or passed the deadline
-        if (absolute_time_diff_us(now, g_ws_next_ping_deadline) > 0)
-        {
-            return; // Not time yet
-        }
 
-        if (g_ws_pending_pings > 0)
+        // Check each active connection
+        for (size_t i = 0; i < WS_MAX_CLIENTS; ++i)
         {
-            ++g_ws_missed_pongs;
-            if (g_ws_missed_pongs > WS_MAX_MISSED_PONGS)
+            ws_connection_state_t* conn = &g_ws_connections[i];
+            if (!conn->active || conn->closing)
             {
-                printf("WebSocket missed %u pongs, closing connection %u\n", g_ws_missed_pongs, g_ws_last_conn_id);
-                g_ws_server->close(g_ws_last_conn_id);
-                mark_connection_closed();
-                return;
+                continue;
             }
-        }
 
-            if (g_ws_server->sendPing(g_ws_last_conn_id, nullptr, 0))
-        {
-            ++g_ws_pending_pings;
-            printf("WebSocket sent PING (pending=%u, missed=%u)\n", g_ws_pending_pings, g_ws_missed_pongs);
-        }
-            else
+            // Check if it's time to send a ping for this connection
+            if (absolute_time_diff_us(now, conn->next_ping_deadline) > 0)
             {
-                ++g_ws_missed_pongs;
-                printf("WebSocket PING send failed (missed=%u)\n", g_ws_missed_pongs);
-                if (g_ws_missed_pongs > WS_MAX_MISSED_PONGS)
+                continue; // Not time yet
+            }
+
+            // Check for missed pongs
+            if (conn->pending_pings > 0)
+            {
+                ++conn->missed_pongs;
+            }
+
+            // Send ping
+            bool ping_sent = false;
+            if (conn->missed_pongs <= WS_MAX_MISSED_PONGS)
+            {
+                ping_sent = g_ws_server->sendPing(conn->conn_id, nullptr, 0);
+                if (ping_sent)
                 {
-                    printf("WebSocket closing connection %u after send failure\n", g_ws_last_conn_id);
-                    g_ws_server->close(g_ws_last_conn_id);
-                    mark_connection_closed();
-                    return;
+                    ++conn->pending_pings;
+                    printf("WebSocket sent PING to %u (pending=%u, missed=%u)\n", conn->conn_id, conn->pending_pings, conn->missed_pongs);
+                }
+                else
+                {
+                    ++conn->missed_pongs;
+                    printf("WebSocket PING send failed to %u (missed=%u)\n", conn->conn_id, conn->missed_pongs);
                 }
             }
 
-        g_ws_next_ping_deadline = delayed_by_ms(now, WS_PING_INTERVAL_MS);
+            // Close if too many missed pongs
+            if (conn->missed_pongs > WS_MAX_MISSED_PONGS)
+            {
+                printf("WebSocket closing connection %u after %u missed pongs\n", conn->conn_id, conn->missed_pongs);
+                g_ws_server->close(conn->conn_id);
+                conn->closing = true;
+                continue;
+            }
+
+            conn->next_ping_deadline = delayed_by_ms(now, WS_PING_INTERVAL_MS);
+        }
     }
 
     void handle_connect(WebSocketServer &server, uint32_t conn_id)
     {
+        ws_connection_state_t* conn = allocate_connection(conn_id);
+        if (!conn)
+        {
+            printf("WebSocket max connections reached, rejecting %u\n", conn_id);
+            server.close(conn_id);
+            return;
+        }
+
         ++g_ws_active_clients;
-        g_ws_last_conn_id = conn_id;
-        reset_ping_state();
-        printf("WebSocket client connected (id=%u)\n", conn_id);
+        printf("WebSocket client connected (id=%u, total=%zu)\n", conn_id, g_ws_active_clients);
 
         ws_context_t *ctx = static_cast<ws_context_t *>(server.getCallbackExtra());
         if (ctx && ctx->callbacks.on_client_connected)
@@ -107,16 +154,22 @@ namespace
 
     void handle_close(WebSocketServer &server, uint32_t conn_id)
     {
-        if (g_ws_active_clients > 0)
+        (void)server;
+
+        // Only decrement if this connection was tracked as active.
+        ws_connection_state_t* conn = find_connection(conn_id);
+        if (conn)
         {
-            --g_ws_active_clients;
+            conn->active = false;
+            conn->closing = false;
+
+            if (g_ws_active_clients > 0)
+            {
+                --g_ws_active_clients;
+            }
         }
-        if (conn_id == g_ws_last_conn_id)
-        {
-            g_ws_last_conn_id = 0;
-            reset_ping_state();
-        }
-        printf("WebSocket client closed (id=%u)\n", conn_id);
+        
+        printf("WebSocket client closed (id=%u, remaining=%zu)\n", conn_id, g_ws_active_clients);
 
         ws_context_t *ctx = static_cast<ws_context_t *>(server.getCallbackExtra());
         if (ctx && ctx->callbacks.on_client_disconnected)
@@ -141,21 +194,35 @@ namespace
 
         if (!keep_open)
         {
+            ws_connection_state_t* conn = find_connection(conn_id);
+            if (conn)
+            {
+                conn->closing = true;
+            }
             server.close(conn_id);
         }
     }
 
     void handle_pong(WebSocketServer &server, uint32_t conn_id, const void *data, size_t len)
     {
+        (void)server;
         (void)data;
         (void)len;
 
-        if (conn_id != g_ws_last_conn_id)
+        ws_connection_state_t* conn = find_connection(conn_id);
+        if (!conn)
         {
             return;
         }
 
-        reset_ping_state();
+        if (conn->closing)
+        {
+            return;
+        }
+
+        conn->pending_pings = 0;
+        conn->missed_pongs = 0;
+        conn->next_ping_deadline = make_timeout_time_ms(WS_PING_INTERVAL_MS);
         printf("WebSocket received PONG from %u\n", conn_id);
     }
 } // namespace
@@ -191,7 +258,7 @@ extern "C"
 
         if (!g_ws_server)
         {
-            g_ws_server = std::make_unique<WebSocketServer>(WS_MAX_CLIENTS);
+            g_ws_server = std::make_unique<WebSocketServer>(WS_SERVER_MAX_CONNECTIONS);
             g_ws_server->setCallbackExtra(&g_ws_context);
             g_ws_server->setConnectCallback(handle_connect);
             g_ws_server->setCloseCallback(handle_close);
@@ -231,12 +298,17 @@ extern "C"
             return;
         }
 
-        if (g_ws_active_clients == 0 || !g_ws_context.callbacks.on_output)
+        // Always process messages even if no active clients (handles close race conditions)
+        g_ws_server->popMessages();
+
+        if (g_ws_active_clients == 0)
         {
             return;
         }
 
-        g_ws_server->popMessages();
+        // Heartbeat: check timers frequently (called every poll loop), so each client
+        // pings relative to its own connect time rather than bunching on ws_poll_outgoing cadence.
+        send_ping_if_due();
     }
 
     void ws_poll_outgoing(void)
@@ -251,9 +323,6 @@ extern "C"
             return;
         }
 
-        // Heartbeat: send PING every WS_PING_INTERVAL_MS, close after WS_MAX_MISSED_PONGS
-        send_ping_if_due();
-
         uint8_t payload[WS_FRAME_PAYLOAD];
 
         size_t payload_len = g_ws_context.callbacks.on_output(payload, sizeof(payload), g_ws_context.callbacks.user_data);
@@ -261,12 +330,21 @@ extern "C"
         {
             return;
         }
-        // printf("WebSocket sending %zu bytes\n", payload_len);
-        if (!g_ws_server->broadcastMessage(payload, payload_len))
+        
+        // Send to each active client individually (best-effort: don't block on slow clients)
+        for (size_t i = 0; i < WS_MAX_CLIENTS; ++i)
         {
-            // Send failed - likely due to full send buffer or network congestion
-            // For real-time terminal output, we drop the data rather than queue it
-            printf("WebSocket send failed, dropping %zu bytes\n", payload_len);
+            ws_connection_state_t* conn = &g_ws_connections[i];
+            if (!conn->active || conn->closing)
+            {
+                continue;
+            }
+            
+            if (!g_ws_server->sendMessage(conn->conn_id, payload, payload_len))
+            {
+                // This specific client's TCP send buffer is full - they miss this frame
+                // (expected under load; real-time data, no backpressure)
+            }
         }
     }
 }

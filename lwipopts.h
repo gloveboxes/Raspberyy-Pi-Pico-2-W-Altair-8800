@@ -19,19 +19,19 @@
 #define MEM_LIBC_MALLOC 0 // Use lwIP's internal memory pool
 #endif
 #define MEM_ALIGNMENT 4           // Memory alignment (4 bytes for ARM)
-#define MEM_SIZE 4000             // Size of the heap memory (bytes)
+#define MEM_SIZE 16000            // Size of the heap memory (bytes) - Increased to prevent fragmentation
 #define MEMP_NUM_TCP_SEG 32       // Number of simultaneously queued TCP segments
 #define MEMP_NUM_ARP_QUEUE 10     // Number of packets queued waiting for ARP resolution
-#define MEMP_NUM_TCP_PCB 10       // Number of simultaneously active TCP connections
-#define MEMP_NUM_TCP_PCB_LISTEN 2 // Number of listening TCP connections
-#define PBUF_POOL_SIZE 24         // Number of buffers in the pbuf pool
+#define MEMP_NUM_TCP_PCB 16       // Number of simultaneously active TCP connections - Increased to handle TIME_WAIT
+#define MEMP_NUM_TCP_PCB_LISTEN 5 // Number of listening TCP connections - Increased to prevent lockout
+#define PBUF_POOL_SIZE 48         // Number of buffers in the pbuf pool - Increased to handle overlap
 #define LWIP_ARP 1                // Enable ARP protocol
 #define LWIP_ETHERNET 1           // Enable Ethernet support
 #define LWIP_ICMP 1               // Enable ICMP protocol (ping)
 #define LWIP_RAW 1                // Enable raw IP sockets
-#define TCP_WND (8 * TCP_MSS)     // TCP receive window size
+#define TCP_WND (6 * TCP_MSS)     // TCP receive window size - Balanced for 8KB HTML content
 #define TCP_MSS 1460              // TCP maximum segment size (bytes)
-#define TCP_SND_BUF (8 * TCP_MSS) // TCP sender buffer space (bytes)
+#define TCP_SND_BUF (6 * TCP_MSS) // TCP sender buffer space (bytes) - Sized to accommodate HTML page
 #define TCP_SND_QUEUELEN ((4 * (TCP_SND_BUF) + (TCP_MSS - 1)) / (TCP_MSS)) // TCP sender buffer space (pbufs)
 #define LWIP_NETIF_STATUS_CALLBACK 1                                       // Enable network interface status callbacks
 #define LWIP_NETIF_LINK_CALLBACK 1                                         // Enable link status change callbacks

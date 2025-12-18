@@ -59,43 +59,48 @@ void inky_display_update(const char* ssid, const char* ip)
     
     int y_pos = 5;
     const int left_margin = 5;
+    const int value_offset = 60;  // Aligned offset for values
     char line_buffer[64];
     
-    // Line 1: Board name (larger font)
+    // Line 1: Title (larger font)
     g_graphics->set_font("bitmap14_outline");
     snprintf(line_buffer, sizeof(line_buffer), "ALTAIR 8800");
     g_graphics->text(line_buffer, {left_margin, y_pos}, 296);
     y_pos += 30;
     
-    // Switch to solid bitmap font for remaining text (bold and clean)
+    // Switch to bitmap8 font for remaining text
     g_graphics->set_font("bitmap8");
     
-    // Line 2: Pico Board
+    // Line 2: Board name (label + value aligned)
+    g_graphics->text("Board", {left_margin, y_pos}, 296);
     snprintf(line_buffer, sizeof(line_buffer), "%s", PICO_BOARD);
-    g_graphics->text(line_buffer, {left_margin, y_pos}, 296);
+    g_graphics->text(line_buffer, {left_margin + value_offset, y_pos}, 296);
     y_pos += 18;
     
-    // Line 3: Build version with date and time
+    // Line 3: Build version with date and time (label + value aligned)
+    g_graphics->text("Build", {left_margin, y_pos}, 296);
     snprintf(line_buffer, sizeof(line_buffer), "v%d %s %s", BUILD_VERSION, BUILD_DATE, BUILD_TIME);
-    g_graphics->text(line_buffer, {left_margin, y_pos}, 296);
+    g_graphics->text(line_buffer, {left_margin + value_offset, y_pos}, 296);
     y_pos += 24;
     
-    // Line 4: WiFi SSID
+    // Line 4: WiFi SSID (label + value aligned)
+    g_graphics->text("WiFi", {left_margin, y_pos}, 296);
     if (ssid && ssid[0] != '\0') {
-        snprintf(line_buffer, sizeof(line_buffer), "SSID: %s", ssid);
+        snprintf(line_buffer, sizeof(line_buffer), "%s", ssid);
     } else {
-        snprintf(line_buffer, sizeof(line_buffer), "SSID: Not connected");
+        snprintf(line_buffer, sizeof(line_buffer), "Not connected");
     }
-    g_graphics->text(line_buffer, {left_margin, y_pos}, 296);
+    g_graphics->text(line_buffer, {left_margin + value_offset, y_pos}, 296);
     y_pos += 20;
     
-    // Line 5: IP Address
+    // Line 5: IP Address (label + value aligned)
+    g_graphics->text("IP", {left_margin, y_pos}, 296);
     if (ip && ip[0] != '\0') {
-        snprintf(line_buffer, sizeof(line_buffer), "IP: %s", ip);
+        snprintf(line_buffer, sizeof(line_buffer), "%s", ip);
     } else {
-        snprintf(line_buffer, sizeof(line_buffer), "IP: ---.---.---.---");
+        snprintf(line_buffer, sizeof(line_buffer), "---.---.---.---");
     }
-    g_graphics->text(line_buffer, {left_margin, y_pos}, 296);
+    g_graphics->text(line_buffer, {left_margin + value_offset, y_pos}, 296);
     
     // Update the physical display
     g_uc8151->update(g_graphics);

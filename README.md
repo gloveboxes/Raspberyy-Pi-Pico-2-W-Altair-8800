@@ -35,19 +35,13 @@ git clone --recurse-submodules https://github.com/gloveboxes/pico-altair-8800.gi
 
 ## Wi-Fi Console
 
-1. Provide credentials via the CMake cache variables (preferred):
-    ```shell
-    cmake -B build -DWIFI_SSID="MyNetwork" -DWIFI_PASSWORD="secretpass"
-    ```
-    The values are injected as preprocessor macros. (You can still fall back to defining `PICO_DEFAULT_WIFI_SSID`/`PICO_DEFAULT_WIFI_PASSWORD` elsewhere if you prefer.)
-2. Enable the optional network console when configuring:
-    ```shell
-    cmake -B build -DALTAIR_ENABLE_WEBSOCKET=ON [...other flags...]
-    ```
-    Leaving it `OFF` (default) keeps the firmware USB-only.
-3. Build and flash as usual. On boot the Pico W connects to Wi-Fi and starts a WebSocket console on port `8082`.
-4. Point a browser at `http://<pico-ip>:8082/` to load the bundled console UI, or use any WebSocket-capable client (e.g., `wscat`) to connect to `ws://<pico-ip>:8082/` and interact with the Altair terminal alongside USB serial.
-5. USB serial stays active; terminal I/O is mirrored between USB and the WebSocket session.
+For WiFi-enabled boards (Pico W, Pico 2 W):
+
+1. WiFi credentials are configured at runtime via a serial terminal app (see WIFI_CONFIG_README.md for details)
+   - Connect using `picocom /dev/tty.usbmodem101 -b 115200` or `screen /dev/tty.usbmodem101 115200`
+   - Follow the on-screen prompts to configure WiFi SSID and password
+2. On boot the Pico W connects to Wi-Fi and starts a WebSocket console on port `8088`
+3. Point a browser at `http://<pico-ip>:8088/` to load the bundled console UI, or use any WebSocket-capable client (e.g., `wscat`) to connect to `ws://<pico-ip>:8088/` and interact with the Altair terminal alongside USB serial
 
 ## Selecting a Target Board
 
@@ -64,11 +58,9 @@ cmake -B build -DPICO_BOARD=pico2 [...other flags...]
 
 | Option | Default | Purpose |
 | --- | --- | --- |
-| `-DWIFI_SSID=""` | empty | Wi-Fi SSID for the Pico W (passed to firmware at build time). |
-| `-DWIFI_PASSWORD=""` | empty | Wi-Fi password accompanying the SSID. |
-| `-DENABLE_INKY_DISPLAY=ON` | ON | Pulls in the Pimoroni Inky Pack driver and shows the welcome/IP screen. Set to `OFF` to save flash/RAM when the display isn't connected. |
-| `-DALTAIR_ENABLE_WEBSOCKET=ON` | OFF | Builds the Wi-Fi/WebSocket console firmware path (adds CYW43 + pico-ws-server stack). |
-| `-DPICO_BOARD=pico2_w` | pico2_w | Selects the Pico variant (e.g., `pico2`, `pico2_w`). WebSockets require a board with CYW43 (the `_w` models). |
+| `-DINKY_SUPPORT=ON` | ON | Pulls in the Pimoroni Inky Pack driver and shows the welcome/IP screen. Set to `OFF` to save flash/RAM when the display isn't connected. |
+| `-DDISPLAY_2_8_SUPPORT=ON` | ON | Enables support for 2.8" display. Set to `OFF` if not using this display. |
+| `-DPICO_BOARD=pico2_w` | pico2_w | Selects the Pico variant (e.g., `pico2`, `pico2_w`, `pico`, `pico_w`). WebSockets are automatically enabled for WiFi-capable boards. |
 | `-DCMAKE_BUILD_TYPE=Release` | Debug | Usual CMake switch for optimized builds (recommended). |
 
 ## Regenerate Disk Image Header
@@ -95,22 +87,56 @@ cmake -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build
 ```
 
+## Deploying Firmware
+
+After building, you can use the deployment script to flash firmware to your Pico board:
+
+```shell
+cd Releases
+./deploy.sh
+```
+
+The script will:
+1. List all available .uf2 firmware files in alphabetical order
+2. Allow you to select which firmware to deploy by entering a number
+3. Automatically reboot the connected Pico into BOOTSEL mode
+4. Upload and run the selected firmware
+5. Return to the file list for deploying to additional boards
+
+Press `q` to quit when finished. The script requires `picotool` to be installed (see installation instructions below).
+
 ## Building for Different Boards
 
 WebSocket support is automatically enabled for WiFi-capable boards (`pico_w` and `pico2_w`) and disabled for non-WiFi boards (`pico` and `pico2`). You can build for specific boards using VS Code tasks:
 
 ### Available Build Tasks
 
-**Individual Board Builds:**
+**Release Build Tasks:**
+- **Clean Build Directory** - Remove the build directory
 - **Build for Pico (Release)** - Raspberry Pi Pico (no WiFi)
 - **Build for Pico W (Release)** - Raspberry Pi Pico W (with WiFi/WebSocket)
 - **Build for Pico 2 (Release)** - Raspberry Pi Pico 2 (no WiFi)
 - **Build for Pico 2 W (Release)** - Raspberry Pi Pico 2 W (with WiFi/WebSocket) *[Default]*
+- **Build for Pimoroni Pico Plus 2W (Release)** - Pimoroni Pico Plus 2 W (with WiFi/WebSocket)
+- **Build for Pico 2 W with Inky (Release)** - Pico 2 W with Inky display support
+- **Build for Pico 2 W with Display 2.8 (Release)** - Pico 2 W with 2.8" display support
 - **Build All Boards (Release)** - Builds for all supported boards
 
-**General Build Tasks:**
-1. **Build Altair (Release)** - Default build task, builds for the board set in CMakeLists.txt (currently `pico2_w`)
-2. **Build Altair (Debug)** - Create a debug build
+**Build and Deploy Tasks:**
+- **Build and Deploy Pico (Release)** - Build and deploy to Pico
+- **Build and Deploy Pico W (Release)** - Build and deploy to Pico W
+- **Build and Deploy Pico 2 (Release)** - Build and deploy to Pico 2
+- **Build and Deploy Pico 2 W (Release)** - Build and deploy to Pico 2 W
+- **Build and Deploy Pico 2 W with Inky (Release)** - Build and deploy Pico 2 W with Inky display
+- **Build and Deploy Pico 2 W with Display 2.8 (Release)** - Build and deploy Pico 2 W with 2.8" display
+
+**Debug Build Tasks:**
+- **Build for Pico (Debug)** - Debug build for Pico
+- **Build for Pico W (Debug)** - Debug build for Pico W
+- **Build for Pico 2 (Debug)** - Debug build for Pico 2
+- **Build for Pico 2 W (Debug)** - Debug build for Pico 2 W
+- **Build for Pimoroni Pico Plus 2W (Debug)** - Debug build for Pimoroni Pico Plus 2 W
+- **Build for Pico 2 W with Inky (Debug)** - Debug build with Inky display support
 
 ### Running Build Tasks
 

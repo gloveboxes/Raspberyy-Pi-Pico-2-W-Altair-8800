@@ -6,6 +6,7 @@
 #include "hardware/timer.h"
 #include "pico/stdlib.h"
 
+#include "PortDrivers/http_io.h"
 #include "websocket_console.h"
 
 // Enable WiFi/WebSocket functionality only if board has WiFi capability
@@ -129,6 +130,7 @@ void websocket_console_start(void)
     }
 
     websocket_queue_init();
+    http_io_init(); // Initialize HTTP file transfer queues
 
     // Start the WebSocket output timer (20ms interval)
     add_repeating_timer_ms(WS_OUTPUT_TIMER_INTERVAL_MS, ws_output_timer_callback, NULL, &ws_output_timer);
@@ -205,6 +207,7 @@ static void websocket_console_core1_entry(void)
     {
         cyw43_arch_poll();
         ws_poll(&pending_ws_input, &pending_ws_output);
+        http_poll(); // Poll for HTTP file transfer requests
         tight_loop_contents();
     }
 }

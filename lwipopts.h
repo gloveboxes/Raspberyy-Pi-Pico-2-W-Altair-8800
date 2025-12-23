@@ -48,6 +48,7 @@
 #define LWIP_TCP 1                  // Enable TCP protocol
 #define LWIP_UDP 1                  // Enable UDP protocol
 #define LWIP_DNS 1                  // Enable DNS client
+#define LWIP_HTTPC 1                // Enable HTTP client
 #define LWIP_TCP_KEEPALIVE 1        // Enable TCP keepalive
 #define LWIP_NETIF_TX_SINGLE_PBUF 1 // Put all data to send into one pbuf (for DMA compatibility)
 #define DHCP_DOES_ARP_CHECK 0       // Disable ARP check on offered DHCP address

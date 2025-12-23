@@ -350,6 +350,13 @@ int main(void)
     printf("========================================\n");
     printf("\n");
 
+#if defined(CYW43_WL_GPIO_LED_PIN)
+    printf("HTTP file transfer: Enabled (gf command supported)\n");
+#else
+    printf("HTTP file transfer: Disabled (no WiFi)\n");
+#endif
+    printf("\n");
+
     // Initialize disk controller
     printf("Initializing disk controller...\n");
 #ifdef SD_CARD_SUPPORT

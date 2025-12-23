@@ -83,6 +83,7 @@ set(ALTAIR_SOURCES
     io_ports.c
     PortDrivers/time_io.c
     PortDrivers/utility_io.c
+    PortDrivers/http_io.c
     websocket_console.c
     wifi_config.c
     comms_mgr.c
@@ -136,9 +137,14 @@ if(PICO_CYW43_SUPPORTED)
             lwipopts_provider
     )
 
-    list(APPEND ALTAIR_SOURCES wifi.c ws.cpp)
+    list(APPEND ALTAIR_SOURCES 
+        wifi.c 
+        ws.cpp
+        ${PICO_SDK_PATH}/lib/lwip/src/apps/http/http_client.c
+    )
     list(APPEND ALTAIR_LIBS pico_ws_server)
 endif()
+
 
 add_executable(altair ${ALTAIR_SOURCES})
 

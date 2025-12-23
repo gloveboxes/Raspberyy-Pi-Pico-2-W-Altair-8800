@@ -30,6 +30,9 @@
 #define PIN_SCK 18
 #define PIN_MOSI 19
 #define PIN_BL 20
+#define PIN_LED_R 26
+#define PIN_LED_G 27
+#define PIN_LED_B 28
 
 // SPI instance
 #define SPI_INST spi0
@@ -159,6 +162,17 @@ bool st7789_async_init(void)
     pwm_set_wrap(slice, 65535);
     pwm_set_gpio_level(PIN_BL, 65535); // Full brightness
     pwm_set_enabled(slice, true);
+
+    // Turn off RGB LED (active-low: HIGH = off, LOW = on)
+    gpio_init(PIN_LED_R);
+    gpio_set_dir(PIN_LED_R, GPIO_OUT);
+    gpio_put(PIN_LED_R, 1);
+    gpio_init(PIN_LED_G);
+    gpio_set_dir(PIN_LED_G, GPIO_OUT);
+    gpio_put(PIN_LED_G, 1);
+    gpio_init(PIN_LED_B);
+    gpio_set_dir(PIN_LED_B, GPIO_OUT);
+    gpio_put(PIN_LED_B, 1);
 
     // Claim DMA channel
     g_dma_channel = dma_claim_unused_channel(true);

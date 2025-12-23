@@ -34,9 +34,6 @@ extern "C"
     // Returns true on success
     bool st7789_async_init(void);
 
-    // Set a pixel at x,y with given color
-    void st7789_async_set_pixel(int x, int y, color_t color);
-
     // Fill a rectangle (for LED drawing)
     void st7789_async_fill_rect(int x, int y, int w, int h, color_t color);
 

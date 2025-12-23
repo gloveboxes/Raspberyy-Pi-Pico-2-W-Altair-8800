@@ -130,45 +130,69 @@ void display_2_8_init_front_panel(void)
 
 void display_2_8_show_front_panel(uint16_t address, uint8_t data, uint16_t status)
 {
+    static uint16_t last_status = 0xFFFF; // Initialize to impossible values to force first draw
+    static uint16_t last_address = 0xFFFF;
+    static uint8_t last_data = 0xFF;
+
+    bool needs_update = false;
+
     color_t LED_ON = rgb332(255, 0, 0); // Bright red
     color_t LED_OFF = rgb332(40, 0, 0); // Dark red
 
     // === ONLY update the LED rectangles (no clear, no labels!) ===
 
-    // STATUS LEDs (10 LEDs)
-    int x_status = 10;
-    int y_status = 35;
-    for (int i = 0; i < 10; i++)
+    // STATUS LEDs (10 LEDs) - only update if changed
+    if (status != last_status)
     {
-        bool led_state = (status >> i) & 1;
-        st7789_async_fill_rect(x_status, y_status, LED_SIZE, LED_SIZE, led_state ? LED_ON : LED_OFF);
-        x_status += LED_SPACING_STATUS;
+        int x_status = 10;
+        int y_status = 35;
+        for (int i = 0; i < 10; i++)
+        {
+            bool led_state = (status >> i) & 1;
+            st7789_async_fill_rect(x_status, y_status, LED_SIZE, LED_SIZE, led_state ? LED_ON : LED_OFF);
+            x_status += LED_SPACING_STATUS;
+        }
+        last_status = status;
+        needs_update = true;
     }
 
-    // ADDRESS LEDs (16 LEDs)
-    int x_addr = 2;
-    int y_addr = 100;
-    for (int i = 15; i >= 0; i--)
+    // ADDRESS LEDs (16 LEDs) - only update if changed
+    if (address != last_address)
     {
-        int bit = 15 - i;
-        bool led_state = (address >> bit) & 1;
-        st7789_async_fill_rect(x_addr, y_addr, LED_SIZE, LED_SIZE, led_state ? LED_ON : LED_OFF);
-        x_addr += LED_SPACING_ADDRESS;
+        int x_addr = 2;
+        int y_addr = 100;
+        for (int i = 15; i >= 0; i--)
+        {
+            int bit = 15 - i;
+            bool led_state = (address >> bit) & 1;
+            st7789_async_fill_rect(x_addr, y_addr, LED_SIZE, LED_SIZE, led_state ? LED_ON : LED_OFF);
+            x_addr += LED_SPACING_ADDRESS;
+        }
+        last_address = address;
+        needs_update = true;
     }
 
-    // DATA LEDs (8 LEDs)
-    int x_data = 2;
-    int y_data = 170;
-    for (int i = 7; i >= 0; i--)
+    // DATA LEDs (8 LEDs) - only update if changed
+    if (data != last_data)
     {
-        int bit = 7 - i;
-        bool led_state = (data >> bit) & 1;
-        st7789_async_fill_rect(x_data, y_data, LED_SIZE, LED_SIZE, led_state ? LED_ON : LED_OFF);
-        x_data += LED_SPACING_DATA;
+        int x_data = 2;
+        int y_data = 170;
+        for (int i = 7; i >= 0; i--)
+        {
+            int bit = 7 - i;
+            bool led_state = (data >> bit) & 1;
+            st7789_async_fill_rect(x_data, y_data, LED_SIZE, LED_SIZE, led_state ? LED_ON : LED_OFF);
+            x_data += LED_SPACING_DATA;
+        }
+        last_data = data;
+        needs_update = true;
     }
 
-    // Non-blocking update
-    st7789_async_update();
+    // Only send update to display if something changed
+    if (needs_update)
+    {
+        st7789_async_update();
+    }
 }
 
 void display_2_8_get_stats(uint64_t* skipped_updates)

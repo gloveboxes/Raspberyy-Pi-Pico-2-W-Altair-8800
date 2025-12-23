@@ -228,7 +228,7 @@ bool st7789_async_init(void)
     return true;
 }
 
-void st7789_async_set_pixel(int x, int y, color_t color)
+static void st7789_async_set_pixel(int x, int y, color_t color)
 {
     if (x >= 0 && x < ST7789_ASYNC_WIDTH && y >= 0 && y < ST7789_ASYNC_HEIGHT)
     {
@@ -284,11 +284,31 @@ void st7789_async_text(const char* str, int x, int y, color_t color)
 
 void st7789_async_fill_rect(int x, int y, int w, int h, color_t color)
 {
+    // Clamp to screen bounds
+    if (x < 0)
+    {
+        w += x;
+        x = 0;
+    }
+    if (y < 0)
+    {
+        h += y;
+        y = 0;
+    }
+    if (x + w > ST7789_ASYNC_WIDTH)
+        w = ST7789_ASYNC_WIDTH - x;
+    if (y + h > ST7789_ASYNC_HEIGHT)
+        h = ST7789_ASYNC_HEIGHT - y;
+    if (w <= 0 || h <= 0)
+        return;
+
+    // Direct framebuffer access (much faster than set_pixel per pixel)
     for (int dy = 0; dy < h; dy++)
     {
+        uint16_t* row = &g_framebuffer[(y + dy) * ST7789_ASYNC_WIDTH + x];
         for (int dx = 0; dx < w; dx++)
         {
-            st7789_async_set_pixel(x + dx, y + dy, color);
+            row[dx] = color;
         }
     }
 }

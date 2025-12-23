@@ -256,36 +256,18 @@ static bool display_timer_callback(struct repeating_timer* t)
     return true; // Keep repeating
 }
 
-// Function to update the display if CPU state has changed (called from main loop)
-void update_display_if_changed(void)
+// Function to update the display (called from main loop)
+static inline void update_display_if_changed(void)
 {
-    // Track last values to detect changes
-    static uint8_t last_status = 0;
-    static uint8_t last_data = 0;
-    static uint16_t last_address = 0;
+    // Construct 10-bit status word for display:
+    // Bits 0-7: CPU status byte (MEMR, INP, M1, OUT, HLTA, STACK, WO, INT)
+    // Bit 9: INTE (Interrupt Enable) flag from CPU flags
+    uint16_t status_word = cpu.cpuStatus;
+    if (cpu.registers.flags & FLAGS_IF)
+        status_word |= (1 << 9);
 
-    // Get current CPU state
-    uint8_t current_status = cpu.cpuStatus;
-    uint8_t current_data = cpu.data_bus;
-    uint16_t current_address = cpu.address_bus;
-
-    // Only update if data has changed (optimization)
-    if (current_status != last_status || current_data != last_data || current_address != last_address)
-    {
-        last_status = current_status;
-        last_data = current_data;
-        last_address = current_address;
-
-        // Construct 10-bit status word for display:
-        // Bits 0-7: CPU status byte (MEMR, INP, M1, OUT, HLTA, STACK, WO, INT)
-        // Bit 9: INTE (Interrupt Enable) flag from CPU flags
-        uint16_t status_word = current_status;
-        if (cpu.registers.flags & FLAGS_IF)
-            status_word |= (1 << 9);
-
-        // Update display with real CPU values
-        display_2_8_show_front_panel(current_address, current_data, status_word);
-    }
+    // display_2_8_show_front_panel handles change detection internally
+    display_2_8_show_front_panel(cpu.address_bus, cpu.data_bus, status_word);
 }
 #endif
 

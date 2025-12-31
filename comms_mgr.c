@@ -106,6 +106,10 @@ static bool wifi_init(void)
 
     wifi_set_connected(true);
 
+    // Use performance power management mode for better responsiveness
+    // CYW43_PERFORMANCE_PM = short 200ms sleep retention, good balance
+    cyw43_wifi_pm(&cyw43_state, CYW43_PERFORMANCE_PM);
+
     // Get and store IP address
     struct netif* netif = netif_default;
     if (netif && netif_is_up(netif))
@@ -132,12 +136,12 @@ void websocket_console_start(void)
     websocket_queue_init();
     http_io_init(); // Initialize HTTP file transfer queues
 
-    // Start the WebSocket output timer (20ms interval)
-    add_repeating_timer_ms(WS_OUTPUT_TIMER_INTERVAL_MS, ws_output_timer_callback, NULL, &ws_output_timer);
+    // Start the WebSocket output timer (20ms fixed interval)
+    add_repeating_timer_ms(-WS_OUTPUT_TIMER_INTERVAL_MS, ws_output_timer_callback, NULL, &ws_output_timer);
     printf("Started WebSocket output timer (%dms interval)\n", WS_OUTPUT_TIMER_INTERVAL_MS);
 
-    // Start the WebSocket input timer (10ms interval)
-    add_repeating_timer_ms(WS_INPUT_TIMER_INTERVAL_MS, ws_input_timer_callback, NULL, &ws_input_timer);
+    // Start the WebSocket input timer (10ms fixed interval)
+    add_repeating_timer_ms(-WS_INPUT_TIMER_INTERVAL_MS, ws_input_timer_callback, NULL, &ws_input_timer);
     printf("Started WebSocket input timer (%dms interval)\n", WS_INPUT_TIMER_INTERVAL_MS);
 
     // Launch core 1 which will handle all Wi-Fi and WebSocket operations

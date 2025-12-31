@@ -27,7 +27,7 @@
 
 #ifndef SD_CARD_SUPPORT
 // Include the CPM disk image (only for embedded XIP disk controller)
-#include "Disks/blank_disk.h"
+#include "Disks/bdsc_v1_60_disk.h"
 #include "Disks/cpm63k_disk.h"
 #endif
 
@@ -435,10 +435,10 @@ int main(void)
     }
 
     // Load blank disk image into drive 1 (DISK_B)
-    printf("Opening DISK_B: blank.dsk (embedded)\n");
-    if (pico_disk_load(1, blank_disk, blank_disk_len))
+    printf("Opening DISK_B: bdsc_v1_60.dsk (embedded)\n");
+    if (pico_disk_load(1, bdsc_v1_60_dsk, bdsc_v1_60_dsk_len))
     {
-        printf("DISK_B opened successfully (%u bytes)\n", blank_disk_len);
+        printf("DISK_B opened successfully (%u bytes)\n", bdsc_v1_60_dsk_len);
     }
     else
     {
@@ -527,10 +527,10 @@ int main(void)
     printf("\n*** Virtual Front Panel (Core 0 Enabled - Polling) ***\n");
     display_2_8_init_front_panel();
 
-    // Start hardware timer for display updates (25ms = 40 Hz)
+    // Start hardware timer for display updates (20ms = 50 Hz)
     static struct repeating_timer display_timer;
-    add_repeating_timer_ms(-25, display_timer_callback, NULL, &display_timer);
-    printf("Display update timer started (40 Hz)\n");
+    add_repeating_timer_ms(-20, display_timer_callback, NULL, &display_timer);
+    printf("Display update timer started (50 Hz)\n");
 #endif
     // ============================================
 

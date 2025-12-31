@@ -47,8 +47,8 @@ include($ENV{PICO_SDK_PATH}/external/pico_sdk_import.cmake)
 project(altair C CXX ASM)
 pico_sdk_init()
 
-# Import Pimoroni Pico libraries if Inky or Display 2.8 support is enabled
-if(INKY_SUPPORT OR DISPLAY_2_8_SUPPORT OR SD_CARD_SUPPORT)
+# Import Pimoroni Pico libraries if Inky, Display 2.8, Waveshare 3.5, or SD card support is enabled
+if(INKY_SUPPORT OR DISPLAY_2_8_SUPPORT OR SD_CARD_SUPPORT OR WAVESHARE_3_5_DISPLAY)
     set(PIMORONI_PICO_PATH ${CMAKE_CURRENT_LIST_DIR}/lib/pimoroni-pico)
     include(${CMAKE_CURRENT_LIST_DIR}/lib/pimoroni-pico/pimoroni_pico_import.cmake)
     
@@ -58,6 +58,11 @@ if(INKY_SUPPORT OR DISPLAY_2_8_SUPPORT OR SD_CARD_SUPPORT)
     if(SD_CARD_SUPPORT)
         add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/drivers/fatfs local-drivers/fatfs)
         add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/drivers/sdcard local-drivers/sdcard)
+    endif()
+    
+    # Add ILI9488 display driver for Waveshare 3.5" display
+    if(WAVESHARE_3_5_DISPLAY)
+        add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/drivers/ili9488 local-drivers/ili9488)
     endif()
     
     # Only build the drivers and libraries we need, not examples
@@ -108,6 +113,13 @@ if(DISPLAY_2_8_SUPPORT)
     list(APPEND ALTAIR_SOURCES
         FrontPanels/display_2_8.c
         FrontPanels/st7789_async.c
+    )
+endif()
+
+# Conditionally add Waveshare 3.5" display sources
+if(WAVESHARE_3_5_DISPLAY)
+    list(APPEND ALTAIR_SOURCES
+        FrontPanels/display_3_5.c
     )
 endif()
 
@@ -270,6 +282,12 @@ if(SD_CARD_SUPPORT)
             SDCARD_PIN_SPI0_CS=22
         )
     endif()
+endif()
+
+# Link Waveshare 3.5" display driver
+if(WAVESHARE_3_5_DISPLAY)
+    target_link_libraries(altair ili9488)
+    target_include_directories(altair PRIVATE ${CMAKE_CURRENT_LIST_DIR}/drivers/ili9488)
 endif()
 
 # Generate .uf2, .elf, etc.

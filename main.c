@@ -10,6 +10,9 @@
 #endif
 #include "FrontPanels/display_2_8.h"
 #include "FrontPanels/inky_display.h"
+#ifdef WAVESHARE_3_5_DISPLAY
+#include "FrontPanels/display_3_5.h"
+#endif
 #include "build_version.h"
 #include "comms_mgr.h"
 #include "cpu_state.h"
@@ -353,10 +356,12 @@ int main(void)
 
 #ifdef WAVESHARE_3_5_DISPLAY
     // Waveshare 3.5" display shares SPI1 with LCD (CS=9), Touch (CS=16), and SD (CS=22)
-    // We must ensure LCD and Touch CS pins are HIGH to prevent SPI bus interference
+    // We MUST ensure LCD and Touch CS pins are HIGH BEFORE SD init to prevent SPI bus interference
+    // (floating CS lines can cause other SPI devices to respond to SD card traffic)
     gpio_init(9);
     gpio_set_dir(9, GPIO_OUT);
     gpio_put(9, 1); // Deselect LCD
+
     gpio_init(16);
     gpio_set_dir(16, GPIO_OUT);
     gpio_put(16, 1); // Deselect Touch
@@ -445,6 +450,15 @@ int main(void)
         printf("DISK_B initialization failed!\n");
         return -1;
     }
+#endif
+
+#ifdef WAVESHARE_3_5_DISPLAY
+    // Initialize 3.5" display
+    // This is AFTER disk initialization to ensure SPI bus is ready
+    // Note: Display has its own SPI initialization in ili9488_init()
+    printf("Initializing Waveshare 3.5\" display...\n");
+    display_3_5_init();
+    printf("Display initialized.\n");
 #endif
 
     // Load disk boot loader ROM at 0xFF00 (ROM_LOADER_ADDRESS)
@@ -571,6 +585,16 @@ int main(void)
         {
             display_update_pending = false;
             update_display_if_changed();
+        }
+#endif
+
+#ifdef WAVESHARE_3_5_DISPLAY
+        // Update instruction counter on 3.5" display
+        static uint32_t instruction_count = 0;
+        instruction_count++;
+        if ((instruction_count & 0xFFF) == 0)
+        { // Update every 4096 iterations
+            display_3_5_update_counter(instruction_count);
         }
 #endif
     }

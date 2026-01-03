@@ -1,5 +1,6 @@
 #include "ws.h"
 
+#include "pico/cyw43_arch.h"
 #include "pico/time.h"
 #include "pico_ws_server/web_socket_server.h"
 
@@ -319,17 +320,19 @@ extern "C"
             return;
         }
 
+        cyw43_arch_lwip_begin();
+
         // Always process messages even if no active clients (handles close race conditions)
         g_ws_server->popMessages();
 
-        if (g_ws_active_clients == 0)
+        if (g_ws_active_clients > 0)
         {
-            return;
+            // Heartbeat: check timers frequently (called every poll loop), so each client
+            // pings relative to its own connect time rather than bunching on ws_poll_outgoing cadence.
+            send_ping_if_due();
         }
 
-        // Heartbeat: check timers frequently (called every poll loop), so each client
-        // pings relative to its own connect time rather than bunching on ws_poll_outgoing cadence.
-        send_ping_if_due();
+        cyw43_arch_lwip_end();
     }
 
     void ws_poll_outgoing(void)
@@ -353,6 +356,8 @@ extern "C"
             return;
         }
 
+        cyw43_arch_lwip_begin();
+
         // Send to each active client individually (best-effort: don't block on slow clients)
         for (size_t i = 0; i < WS_MAX_CLIENTS; ++i)
         {
@@ -374,5 +379,7 @@ extern "C"
 #endif
             }
         }
+
+        cyw43_arch_lwip_end();
     }
 }

@@ -1,5 +1,5 @@
-#ifndef _PICO_DISK_H_
-#define _PICO_DISK_H_
+#ifndef _PICO_88DCDD_FLASH_H_
+#define _PICO_88DCDD_FLASH_H_
 
 #include "types.h"
 #include <stdbool.h>
@@ -41,28 +41,33 @@
 // Hash table size for sector patches (power of 2 for fast modulo)
 #define PATCH_HASH_SIZE 32
 
+// Static patch pool configuration
+// Each patch is ~141 bytes (137 data + 2 index + 2 next_index)
+// 1200 patches = ~165KB
+#define PATCH_POOL_SIZE 1200
+
 typedef struct sector_patch
 {
-    uint16_t index;
-    struct sector_patch* next;
+    uint16_t index;           // Sector index this patch applies to
+    uint16_t next_pool_index; // Index into static pool (0xFFFF = end of list)
     uint8_t data[SECTOR_SIZE];
 } sector_patch_t;
 
 typedef struct
 {
-    const uint8_t* disk_image_flash;             // Read-only pointer to flash image
-    uint32_t disk_size;                          // Size of disk image
-    uint8_t track;                               // Current track (0-76)
-    uint8_t sector;                              // Current sector (0-31)
-    uint8_t status;                              // Status register
-    uint8_t write_status;                        // Write operation status
-    uint32_t disk_pointer;                       // Current position in disk
-    uint8_t sector_pointer;                      // Position within current sector
-    uint8_t sector_data[SECTOR_SIZE + 2];        // Sector buffer
-    bool sector_dirty;                           // Sector needs writing back
-    bool have_sector_data;                       // Sector buffer is valid
-    bool disk_loaded;                            // Disk image is loaded
-    sector_patch_t* patch_hash[PATCH_HASH_SIZE]; // Hash table of modified sectors
+    const uint8_t* disk_image_flash;      // Read-only pointer to flash image
+    uint32_t disk_size;                   // Size of disk image
+    uint8_t track;                        // Current track (0-76)
+    uint8_t sector;                       // Current sector (0-31)
+    uint8_t status;                       // Status register
+    uint8_t write_status;                 // Write operation status
+    uint32_t disk_pointer;                // Current position in disk
+    uint8_t sector_pointer;               // Position within current sector
+    uint8_t sector_data[SECTOR_SIZE + 2]; // Sector buffer
+    bool sector_dirty;                    // Sector needs writing back
+    bool have_sector_data;                // Sector buffer is valid
+    bool disk_loaded;                     // Disk image is loaded
+    uint16_t patch_hash[PATCH_HASH_SIZE]; // Hash table - indices into static pool (0xFFFF = empty)
 } pico_disk_t;
 
 typedef struct
@@ -86,5 +91,8 @@ uint8_t pico_disk_read(void);
 // Initialization
 void pico_disk_init(void);
 bool pico_disk_load(uint8_t drive, const uint8_t* disk_image, uint32_t size);
+
+// Statistics
+void pico_disk_get_patch_stats(uint16_t* used, uint16_t* total);
 
 #endif

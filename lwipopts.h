@@ -19,19 +19,19 @@
 #define MEM_LIBC_MALLOC 0 // Use lwIP's internal memory pool
 #endif
 #define MEM_ALIGNMENT 4           // Memory alignment (4 bytes for ARM)
-#define MEM_SIZE 16000            // Size of the heap memory (bytes) - Increased to prevent fragmentation
-#define MEMP_NUM_TCP_SEG 32       // Number of simultaneously queued TCP segments
+#define MEM_SIZE 12000            // Size of the heap memory (bytes) - Increased to prevent fragmentation
+#define MEMP_NUM_TCP_SEG 24       // Number of simultaneously queued TCP segments
 #define MEMP_NUM_ARP_QUEUE 10     // Number of packets queued waiting for ARP resolution
 #define MEMP_NUM_TCP_PCB 16       // Number of simultaneously active TCP connections - Increased to handle TIME_WAIT
 #define MEMP_NUM_TCP_PCB_LISTEN 5 // Number of listening TCP connections - Increased to prevent lockout
-#define PBUF_POOL_SIZE 24         // Number of buffers in the pbuf pool - Reduced for memory savings
+#define PBUF_POOL_SIZE 16         // Number of buffers in the pbuf pool - Reduced for memory savings
 #define LWIP_ARP 1                // Enable ARP protocol
 #define LWIP_ETHERNET 1           // Enable Ethernet support
-#define LWIP_ICMP 1               // Enable ICMP protocol (ping)
-#define LWIP_RAW 1                // Enable raw IP sockets
-#define TCP_WND (6 * TCP_MSS)     // TCP receive window size - Balanced for 8KB HTML content
+#define LWIP_ICMP 0               // Disable ICMP protocol (ping)
+#define LWIP_RAW 0                // Disable raw IP sockets
+#define TCP_WND (4 * TCP_MSS)     // TCP receive window size - Balanced for 8KB HTML content
 #define TCP_MSS 1460              // TCP maximum segment size (bytes)
-#define TCP_SND_BUF (6 * TCP_MSS) // TCP sender buffer space (bytes) - Sized to accommodate HTML page
+#define TCP_SND_BUF (4 * TCP_MSS) // TCP sender buffer space (bytes) - Sized to accommodate HTML page
 #define TCP_SND_QUEUELEN ((4 * (TCP_SND_BUF) + (TCP_MSS - 1)) / (TCP_MSS)) // TCP sender buffer space (pbufs)
 #define LWIP_NETIF_STATUS_CALLBACK 1                                       // Enable network interface status callbacks
 #define LWIP_NETIF_LINK_CALLBACK 1                                         // Enable link status change callbacks
@@ -53,6 +53,14 @@
 #define LWIP_NETIF_TX_SINGLE_PBUF 1 // Put all data to send into one pbuf (for DMA compatibility)
 #define DHCP_DOES_ARP_CHECK 0       // Disable ARP check on offered DHCP address
 #define LWIP_DHCP_DOES_ACD_CHECK 0  // Disable Address Conflict Detection
+
+// Additional optimizations
+#define TCP_TMR_INTERVAL 250     // TCP timer interval (default 250ms)
+#define LWIP_SO_RCVTIMEO 1       // Enable receive timeouts (useful for HTTP)
+#define MEMP_NUM_PBUF 16         // Number of pbufs for memp pool
+#define DNS_MAX_SERVERS 2        // Limit DNS servers (default 2)
+#define DNS_TABLE_SIZE 4         // DNS cache entries - reduced from default 8
+#define HTTPC_DEBUG LWIP_DBG_OFF // Disable HTTP client debug
 
 #ifndef NDEBUG
 #define LWIP_DEBUG 1         // Enable debug output in debug builds

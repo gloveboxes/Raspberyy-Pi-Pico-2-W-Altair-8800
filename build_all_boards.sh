@@ -31,8 +31,8 @@ fi
 echo ""
 
 # Array of boards to test
-# Array of boards to test
-BOARDS=("pico" "pico_w" "pico_w_inky" "pico_display28" "pico2" "pico2_w" "pico2_w_sd" "pimoroni_pico_plus2_w_rp2350" "pimoroni_pico_plus2_w_rp2350_sd" "pimoroni_pico_plus2_w_rp2350_display28" "pimoroni_pico_plus2_w_rp2350_waveshare35_sd" "pico2_w_inky" "pico2_display28" "pico2_w_display28")
+# Note: Display 2.8 and large patch pool require RP2350 (520KB RAM) - pico/pico_w only have 264KB
+BOARDS=("pico" "pico2" "pico2_w" "pico2_w_sd" "pimoroni_pico_plus2_w_rp2350" "pimoroni_pico_plus2_w_rp2350_sd" "pimoroni_pico_plus2_w_rp2350_display28" "pimoroni_pico_plus2_w_rp2350_waveshare35_sd" "pico2_w_inky" "pico2_display28" "pico2_w_display28")
 
 # Create tests directory
 TESTS_DIR="${SCRIPT_DIR}/tests"
@@ -41,6 +41,11 @@ mkdir -p "$TESTS_DIR"
 echo -e "${BLUE}=================================${NC}"
 echo -e "${BLUE}Altair 8800 Multi-Board Build Test${NC}"
 echo -e "${BLUE}=================================${NC}"
+echo ""
+
+# Clean up old releases
+echo -e "${YELLOW}Cleaning up old releases...${NC}"
+rm -f "${SCRIPT_DIR}/Releases/"*.uf2
 echo ""
 
 # Track build results (using simple arrays as fallback for zsh compatibility)

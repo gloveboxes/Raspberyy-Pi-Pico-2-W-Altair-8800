@@ -1,10 +1,19 @@
-#include "pico_disk.h"
+#include "pico_88dcdd_flash.h"
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 
 // Global disk controller instance
 pico_disk_controller_t pico_disk_controller;
+
+// Static patch pool - pre-allocated to avoid heap exhaustion
+// 256 patches × ~141 bytes = ~36KB
+static sector_patch_t g_patch_pool[PATCH_POOL_SIZE];
+static uint16_t g_patch_pool_next_free = 0; // Next index to allocate
+static uint16_t g_patch_pool_used = 0;      // Number of patches currently in use
+static bool g_patch_pool_exhausted = false; // Set true when pool is full
+
+// Invalid index marker
+#define PATCH_INDEX_INVALID 0xFFFF
 
 static inline void set_status(uint8_t bit)
 {
@@ -26,55 +35,96 @@ static inline uint8_t hash_sector(uint16_t index)
     return (uint8_t)(index & (PATCH_HASH_SIZE - 1));
 }
 
-static sector_patch_t* find_patch(pico_disk_t* disk, uint16_t index)
+// Find a patch in the hash table, returns pool index or PATCH_INDEX_INVALID
+static uint16_t find_patch_index(pico_disk_t* disk, uint16_t sector_index)
 {
-    uint8_t bucket = hash_sector(index);
-    sector_patch_t* node = disk->patch_hash[bucket];
-    while (node)
+    uint8_t bucket = hash_sector(sector_index);
+    uint16_t pool_idx = disk->patch_hash[bucket];
+
+    while (pool_idx != PATCH_INDEX_INVALID)
     {
-        if (node->index == index)
+        if (g_patch_pool[pool_idx].index == sector_index)
         {
-            return node;
+            return pool_idx;
         }
-        node = node->next;
+        pool_idx = g_patch_pool[pool_idx].next_pool_index;
     }
-    return NULL;
+    return PATCH_INDEX_INVALID;
 }
 
+// Allocate a new patch from the static pool
+static uint16_t alloc_patch(void)
+{
+    // Linear scan for a free slot (could optimize with free list if needed)
+    for (uint16_t i = 0; i < PATCH_POOL_SIZE; i++)
+    {
+        uint16_t idx = (g_patch_pool_next_free + i) % PATCH_POOL_SIZE;
+        // Check if this slot is unused (index == 0xFFFF means free)
+        if (g_patch_pool[idx].index == PATCH_INDEX_INVALID)
+        {
+            g_patch_pool_next_free = (idx + 1) % PATCH_POOL_SIZE;
+            g_patch_pool_used++;
+            return idx;
+        }
+    }
+
+    // Pool exhausted
+    if (!g_patch_pool_exhausted)
+    {
+        g_patch_pool_exhausted = true;
+        printf("[DISK] ERROR: Patch pool exhausted (%u/%u). Disk writes will be lost!\n", g_patch_pool_used,
+               PATCH_POOL_SIZE);
+    }
+    return PATCH_INDEX_INVALID;
+}
+
+// Get or create a patch for a sector, returns pool index or PATCH_INDEX_INVALID
+static uint16_t get_patch(pico_disk_t* disk, uint16_t sector_index)
+{
+    // First, check if patch already exists
+    uint16_t existing = find_patch_index(disk, sector_index);
+    if (existing != PATCH_INDEX_INVALID)
+    {
+        return existing;
+    }
+
+    // Allocate new patch from pool
+    uint16_t new_idx = alloc_patch();
+    if (new_idx == PATCH_INDEX_INVALID)
+    {
+        return PATCH_INDEX_INVALID;
+    }
+
+    // Initialize the patch
+    g_patch_pool[new_idx].index = sector_index;
+    memset(g_patch_pool[new_idx].data, 0, SECTOR_SIZE);
+
+    // Insert into hash table
+    uint8_t bucket = hash_sector(sector_index);
+    g_patch_pool[new_idx].next_pool_index = disk->patch_hash[bucket];
+    disk->patch_hash[bucket] = new_idx;
+
+    return new_idx;
+}
+
+// Clear all patches for a disk (return them to the pool)
 static void clear_patches(pico_disk_t* disk)
 {
     for (uint8_t i = 0; i < PATCH_HASH_SIZE; i++)
     {
-        sector_patch_t* node = disk->patch_hash[i];
-        while (node)
+        uint16_t pool_idx = disk->patch_hash[i];
+        while (pool_idx != PATCH_INDEX_INVALID)
         {
-            sector_patch_t* next = node->next;
-            free(node);
-            node = next;
+            uint16_t next = g_patch_pool[pool_idx].next_pool_index;
+            // Mark as free by setting index to invalid
+            g_patch_pool[pool_idx].index = PATCH_INDEX_INVALID;
+            g_patch_pool[pool_idx].next_pool_index = PATCH_INDEX_INVALID;
+            g_patch_pool_used--;
+            pool_idx = next;
         }
-        disk->patch_hash[i] = NULL;
+        disk->patch_hash[i] = PATCH_INDEX_INVALID;
     }
-}
-
-static sector_patch_t* get_patch(pico_disk_t* disk, uint16_t index)
-{
-    sector_patch_t* existing = find_patch(disk, index);
-    if (existing)
-    {
-        return existing;
-    }
-    sector_patch_t* node = (sector_patch_t*)malloc(sizeof(sector_patch_t));
-    if (!node)
-    {
-        printf("[PATCH] ERROR: Failed to allocate patch for sector %u\n", index);
-        return NULL;
-    }
-    node->index = index;
-    uint8_t bucket = hash_sector(index);
-    node->next = disk->patch_hash[bucket];
-    disk->patch_hash[bucket] = node;
-    memset(node->data, 0, SECTOR_SIZE);
-    return node;
+    g_patch_pool_exhausted = false; // Pool might have space again
 }
 
 static void flush_sector(pico_disk_t* disk)
@@ -85,11 +135,12 @@ static void flush_sector(pico_disk_t* disk)
     }
 
     uint16_t sector_index = (uint16_t)(disk->disk_pointer / SECTOR_SIZE);
-    sector_patch_t* patch = get_patch(disk, sector_index);
-    if (patch)
+    uint16_t patch_idx = get_patch(disk, sector_index);
+    if (patch_idx != PATCH_INDEX_INVALID)
     {
-        memcpy(patch->data, disk->sector_data, SECTOR_SIZE);
+        memcpy(g_patch_pool[patch_idx].data, disk->sector_data, SECTOR_SIZE);
     }
+    // Note: if patch allocation failed, data is lost (error already printed)
 
     disk->sector_dirty = false;
     disk->have_sector_data = false;
@@ -120,6 +171,16 @@ void pico_disk_init(void)
 {
     memset(&pico_disk_controller, 0, sizeof(pico_disk_controller_t));
 
+    // Initialize static patch pool - all entries marked as free
+    for (uint16_t i = 0; i < PATCH_POOL_SIZE; i++)
+    {
+        g_patch_pool[i].index = PATCH_INDEX_INVALID;
+        g_patch_pool[i].next_pool_index = PATCH_INDEX_INVALID;
+    }
+    g_patch_pool_next_free = 0;
+    g_patch_pool_used = 0;
+    g_patch_pool_exhausted = false;
+
     // Initialize all drives
     for (int i = 0; i < MAX_DRIVES; i++)
     {
@@ -128,12 +189,19 @@ void pico_disk_init(void)
         pico_disk_controller.disk[i].sector = 0;
         pico_disk_controller.disk[i].disk_loaded = false;
         pico_disk_controller.disk[i].disk_image_flash = NULL;
-        memset(pico_disk_controller.disk[i].patch_hash, 0, sizeof(pico_disk_controller.disk[i].patch_hash));
+        // Initialize hash table with invalid indices
+        for (uint8_t j = 0; j < PATCH_HASH_SIZE; j++)
+        {
+            pico_disk_controller.disk[i].patch_hash[j] = PATCH_INDEX_INVALID;
+        }
     }
 
     // Select drive 0 by default
     pico_disk_controller.current = &pico_disk_controller.disk[0];
     pico_disk_controller.current_disk = 0;
+
+    printf("[DISK] Patch pool initialized: %u slots (%u KB)\n", PATCH_POOL_SIZE,
+           (PATCH_POOL_SIZE * sizeof(sector_patch_t)) / 1024);
 }
 
 // Load disk image for specified drive (Copy-on-Write)
@@ -158,7 +226,11 @@ bool pico_disk_load(uint8_t drive, const uint8_t* disk_image, uint32_t size)
     disk->sector_dirty = false;
     disk->have_sector_data = false;
     disk->write_status = 0;
-    memset(disk->patch_hash, 0, sizeof(disk->patch_hash));
+    // Initialize hash table with invalid indices
+    for (uint8_t i = 0; i < PATCH_HASH_SIZE; i++)
+    {
+        disk->patch_hash[i] = PATCH_INDEX_INVALID;
+    }
 
     // Start from default hardware reset value, then reflect initial state
     disk->status = STATUS_DEFAULT;
@@ -339,11 +411,13 @@ uint8_t pico_disk_read(void)
         {
             memcpy(disk->sector_data, &disk->disk_image_flash[offset], SECTOR_SIZE);
             disk->have_sector_data = true;
+
+            // Apply patch if exists
             uint16_t sector_index = (uint16_t)(offset / SECTOR_SIZE);
-            sector_patch_t* patch = find_patch(disk, sector_index);
-            if (patch)
+            uint16_t patch_idx = find_patch_index(disk, sector_index);
+            if (patch_idx != PATCH_INDEX_INVALID)
             {
-                memcpy(disk->sector_data, patch->data, SECTOR_SIZE);
+                memcpy(disk->sector_data, g_patch_pool[patch_idx].data, SECTOR_SIZE);
             }
         }
     }
@@ -351,4 +425,17 @@ uint8_t pico_disk_read(void)
     // Return current byte and advance pointer within sector
     // Note: Sector positioning is controlled by pico_disk_sector() (port 0x09), not here
     return disk->sector_data[disk->sector_pointer++];
+}
+
+// Get patch pool statistics
+void pico_disk_get_patch_stats(uint16_t* used, uint16_t* total)
+{
+    if (used)
+    {
+        *used = g_patch_pool_used;
+    }
+    if (total)
+    {
+        *total = PATCH_POOL_SIZE;
+    }
 }

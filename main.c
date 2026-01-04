@@ -6,7 +6,7 @@
 #include "drivers/sdcard/sdcard.h"
 #include "ff.h"
 #else
-#include "Altair8800/pico_disk.h"
+#include "Altair8800/pico_88dcdd_flash.h"
 #endif
 #include "FrontPanels/display_2_8.h"
 #include "FrontPanels/inky_display.h"

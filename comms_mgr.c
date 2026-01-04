@@ -27,7 +27,7 @@
 
 #define WIFI_CONNECT_TIMEOUT_MS 30000
 #define WS_OUTPUT_TIMER_INTERVAL_MS 20
-#define WS_INPUT_TIMER_INTERVAL_MS 10
+#define WS_INPUT_TIMER_INTERVAL_MS 5
 
 static void websocket_console_core1_entry(void);
 

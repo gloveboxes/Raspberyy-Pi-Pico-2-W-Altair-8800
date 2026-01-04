@@ -117,7 +117,7 @@ endif()
 if(SD_CARD_SUPPORT)
     list(APPEND ALTAIR_SOURCES Altair8800/pico_88dcdd_sd_card.c)
 else()
-    list(APPEND ALTAIR_SOURCES Altair8800/pico_disk.c)
+    list(APPEND ALTAIR_SOURCES Altair8800/pico_88dcdd_flash.c)
 endif()
 
 set(ALTAIR_LIBS)
